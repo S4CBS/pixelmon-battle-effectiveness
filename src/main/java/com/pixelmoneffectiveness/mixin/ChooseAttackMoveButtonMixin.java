@@ -60,7 +60,7 @@ public abstract class ChooseAttackMoveButtonMixin {
     @Redirect(
         method = "renderAttackPPAndType",
         at = @At(
-            value = "INVOKEVIRTUAL",
+            value = "INVOKE",
             target = "Lcom/pixelmonmod/pixelmon/api/pokemon/type/Type;getTotalEffectiveness(Ljava/util/List;Z)D"
         )
     )
@@ -74,7 +74,7 @@ public abstract class ChooseAttackMoveButtonMixin {
     @Redirect(
         method = "renderAttackPPAndType",
         at = @At(
-            value = "INVOKEVIRTUAL",
+            value = "INVOKE",
             target = "Lcom/pixelmonmod/pixelmon/battles/attacks/Effectiveness;displayName()Lnet/minecraft/network/chat/Component;"
         )
     )

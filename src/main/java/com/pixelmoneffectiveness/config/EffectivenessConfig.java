@@ -11,6 +11,7 @@ public class EffectivenessConfig {
     public final ModConfigSpec.BooleanValue showMultiplier;
     public final ModConfigSpec.BooleanValue showForNormalMoves;
     public final ModConfigSpec.BooleanValue showForStatusMoves;
+    public final ModConfigSpec.BooleanValue apricornHarvestEnabled;
 
     public EffectivenessConfig(ModConfigSpec.Builder builder) {
         builder.push("general");
@@ -34,6 +35,11 @@ public class EffectivenessConfig {
             .comment("Показывать ли эффективность для статусных атак (без урона). Если false, то для них пишется только 'Не действует' при невосприимчивости цели (0x).",
                      "If true, show type effectiveness for status moves. If false, status moves only display when target is immune (0x).")
             .define("showForStatusMoves", false);
+
+        apricornHarvestEnabled = builder
+            .comment("Включить быстрый сбор всех априкорнов с дерева при нажатии Shift + ПКМ по стволу или листве.",
+                     "Enable harvesting all apricorns from a tree when Shift + Right-Clicking the trunk or leaves.")
+            .define("apricornHarvestEnabled", true);
 
         builder.pop();
     }

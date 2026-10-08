@@ -4,5 +4,6 @@
   "pixelmoneffectiveness.normal": "Эффективно (1x)",
   "pixelmoneffectiveness.not": "Не очень эфф. (0.5x)",
   "pixelmoneffectiveness.barely": "Едва эфф. (0.25x)",
-  "pixelmoneffectiveness.none": "Не действует (0x)"
+  "pixelmoneffectiveness.none": "Не действует (0x)",
+  "pixelmoneffectiveness.apricorn.harvested": "§aСобрано априкорнов: %s"
 }
