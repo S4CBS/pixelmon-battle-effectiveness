@@ -13,6 +13,13 @@ public class EffectivenessConfig {
     public final ModConfigSpec.BooleanValue showForStatusMoves;
     public final ModConfigSpec.BooleanValue apricornHarvestEnabled;
 
+    public final ModConfigSpec.BooleanValue radarEnabled;
+    public final ModConfigSpec.BooleanValue radarHudEnabled;
+    public final ModConfigSpec.BooleanValue radarEsp3dEnabled;
+    public final ModConfigSpec.IntValue radarScanRadius;
+    public final ModConfigSpec.BooleanValue radarSoundAlert;
+    public final ModConfigSpec.BooleanValue radarFilterNormalPoke;
+
     public EffectivenessConfig(ModConfigSpec.Builder builder) {
         builder.push("general");
 
@@ -40,6 +47,40 @@ public class EffectivenessConfig {
             .comment("Включить быстрый сбор всех априкорнов с дерева при нажатии Shift + ПКМ по стволу или листве.",
                      "Enable harvesting all apricorns from a tree when Shift + Right-Clicking the trunk or leaves.")
             .define("apricornHarvestEnabled", true);
+
+        builder.pop();
+
+        builder.push("radar");
+
+        radarEnabled = builder
+            .comment("Включить радар PokéLoot для поиска сундуков-покеболов.",
+                     "Enable PokéLoot radar for finding pokéchest balls.")
+            .define("enabled", true);
+
+        radarHudEnabled = builder
+            .comment("Показывать экранную панель радара со стрелками направления и дистанцией.",
+                     "Show on-screen radar HUD with direction arrows and distance.")
+            .define("hudEnabled", true);
+
+        radarEsp3dEnabled = builder
+            .comment("Отображать 3D метки лута прямо в мире сквозь стены и блоки.",
+                     "Display 3D loot markers in-world through walls and blocks.")
+            .define("esp3dEnabled", true);
+
+        radarScanRadius = builder
+            .comment("Радиус сканирования чанков вокруг игрока (от 2 до 24). 12 чанков = ~192 блока.",
+                     "Chunk scan radius around player (2 to 24). 12 chunks = ~192 blocks.")
+            .defineInRange("scanRadius", 12, 2, 24);
+
+        radarSoundAlert = builder
+            .comment("Воспроизводить звуковое оповещение при обнаружении редкого Мастер или Бист лута.",
+                     "Play audio alert chime when rare Master or Beast loot is found.")
+            .define("soundAlert", true);
+
+        radarFilterNormalPoke = builder
+            .comment("Скрывать обычные (красные) поке-луты, отображая только Ультра, Мастер, Бист и Спец.",
+                     "Hide normal (red) poké loot, only showing Ultra, Master, Beast, and Special loot.")
+            .define("filterNormalPoke", false);
 
         builder.pop();
     }

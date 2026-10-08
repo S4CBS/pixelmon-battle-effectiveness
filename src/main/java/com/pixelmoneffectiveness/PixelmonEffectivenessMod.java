@@ -1,11 +1,14 @@
 package com.pixelmoneffectiveness;
 
 import com.pixelmoneffectiveness.config.EffectivenessConfig;
+import com.pixelmoneffectiveness.client.radar.PokeLootRadarClient;
 import com.pixelmoneffectiveness.handler.ApricornTreeHarvestHandler;
+import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
+import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.common.NeoForge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,5 +22,9 @@ public class PixelmonEffectivenessMod {
         LOGGER.info("Initializing Pixelmon Battle Effectiveness mod");
         modContainer.registerConfig(ModConfig.Type.CLIENT, EffectivenessConfig.SPEC);
         NeoForge.EVENT_BUS.addListener(ApricornTreeHarvestHandler::onRightClickBlock);
+
+        if (FMLEnvironment.dist == Dist.CLIENT) {
+            PokeLootRadarClient.init(modEventBus);
+        }
     }
 }

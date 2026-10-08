@@ -5,5 +5,7 @@
   "pixelmoneffectiveness.not": "Not Very Eff. (0.5x)",
   "pixelmoneffectiveness.barely": "Barely Eff. (0.25x)",
   "pixelmoneffectiveness.none": "Immune (0x)",
-  "pixelmoneffectiveness.apricorn.harvested": "§aHarvested %s apricorns"
+  "pixelmoneffectiveness.apricorn.harvested": "§aHarvested %s apricorns",
+  "key.pixelmoneffectiveness.toggle_radar": "Toggle PokéLoot Radar",
+  "key.categories.pixelmoneffectiveness": "Pixelmon Utilities"
 }

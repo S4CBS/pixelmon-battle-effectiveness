@@ -5,5 +5,7 @@
   "pixelmoneffectiveness.not": "Не очень эфф. (0.5x)",
   "pixelmoneffectiveness.barely": "Едва эфф. (0.25x)",
   "pixelmoneffectiveness.none": "Не действует (0x)",
-  "pixelmoneffectiveness.apricorn.harvested": "§aСобрано априкорнов: %s"
+  "pixelmoneffectiveness.apricorn.harvested": "§aСобрано априкорнов: %s",
+  "key.pixelmoneffectiveness.toggle_radar": "Вкл/Выкл радар PokéLoot",
+  "key.categories.pixelmoneffectiveness": "Pixelmon Utilities"
 }
