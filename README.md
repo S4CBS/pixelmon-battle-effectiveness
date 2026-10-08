@@ -106,7 +106,7 @@ As a result, players usually only ever saw effectiveness hints during **Raid Bos
    - **NeoForge** (версия `21.1.200` или новее)
    - **Pixelmon Reforged** (версия `9.4.0` / `9.4.1` или новее для 1.21.1)
 2. Скачайте последний `.jar` файл со страницы [Releases](https://github.com/S4CBS/pixelmon-battle-effectiveness/releases).
-3. Поместите скачанный файл `PixelmonEffectiveness-1.21.1-1.0.0.jar` в папку `.minecraft/mods/`.
+3. Поместите скачанный файл `PixelmonEffectiveness-1.21.1-1.0.1.jar` в папку `.minecraft/mods/`.
 4. Запустите игру и вступайте в бой!
 
 > 💡 **Клиентский мод**: Мод является исключительно клиентским (Client-Side). Он не требует установки на сервер и прекрасно работает при игре на любых серверах Pixelmon!
@@ -146,7 +146,20 @@ git clone https://github.com/S4CBS/pixelmon-battle-effectiveness.git
 cd pixelmon-battle-effectiveness
 ./gradlew build
 ```
-Собранный файл появится в `build/libs/PixelmonEffectiveness-1.21.1-1.0.0.jar`.
+Собранный файл появится в `build/libs/PixelmonEffectiveness-1.21.1-1.0.1.jar`.
+
+---
+
+## 📝 История версий / Changelog
+
+### v1.0.1
+- 🔧 **Исправлена совместимость с Java 21**: сборка скомпилирована с жёстким таргетом Java 21 (`--release 21`, байткод v65), что предотвращает ошибку `UnsupportedClassVersionError` на стандартных версиях Java в лаунчерах Minecraft 1.21.1.
+- 📦 Обновлена версия мода до `1.0.1`.
+
+### v1.0.0
+- 🎉 Первый релиз мода для Minecraft 1.21.1 NeoForge и Pixelmon Reforged 9.4.x.
+- ⚡ Подсказки эффективности и множителей урона в каждой битве для всех атак.
+- 👥 Полная поддержка Double Battles, терасталлизации и особых приёмов (Freeze-Dry).
 
 ---
 

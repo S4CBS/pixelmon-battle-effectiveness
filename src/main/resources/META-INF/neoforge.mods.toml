@@ -4,7 +4,7 @@ license="MIT"
 
 [[mods]]
 modId="pixelmoneffectiveness"
-version="1.0.0"
+version="1.0.1"
 displayName="Pixelmon Battle Effectiveness"
 authors="s4cbs"
 description='''Shows attack effectiveness and damage multiplier hints for all moves in every battle (not just raid bosses), for Pixelmon Reforged 1.21.1.'''
