@@ -1,0 +1,34 @@
+modLoader="javafml"
+loaderVersion="[4,)"
+license="MIT"
+
+[[mods]]
+modId="pixelmoneffectiveness"
+version="1.0.0"
+displayName="Pixelmon Battle Effectiveness"
+authors="s4cbs"
+description='''Shows attack effectiveness and damage multiplier hints for all moves in every battle (not just raid bosses), for Pixelmon Reforged 1.21.1.'''
+
+[[mixins]]
+config="pixelmon_effectiveness.mixins.json"
+
+[[dependencies.pixelmoneffectiveness]]
+modId="neoforge"
+type="required"
+versionRange="[21.1.0,)"
+ordering="NONE"
+side="CLIENT"
+
+[[dependencies.pixelmoneffectiveness]]
+modId="minecraft"
+type="required"
+versionRange="[1.21.1,1.21.2)"
+ordering="NONE"
+side="CLIENT"
+
+[[dependencies.pixelmoneffectiveness]]
+modId="pixelmon"
+type="required"
+versionRange="[9.4.0,)"
+ordering="AFTER"
+side="CLIENT"

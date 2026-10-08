@@ -1,0 +1,8 @@
+{
+  "pixelmon.normal_effective": "Effective (1x)",
+  "pixelmon.super_effective": "Super Effective (2x)",
+  "pixelmon.max_effective": "Hyper Effective (4x)",
+  "pixelmon.not_effective": "Not Very Effective (0.5x)",
+  "pixelmon.barely_effective": "Barely Effective (0.25x)",
+  "pixelmon.none_effective": "Immune (0x)"
+}

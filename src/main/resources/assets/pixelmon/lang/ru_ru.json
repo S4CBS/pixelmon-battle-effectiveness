@@ -1,0 +1,8 @@
+{
+  "pixelmon.normal_effective": "Эффективно (1x)",
+  "pixelmon.super_effective": "Суперэфф. (2x)",
+  "pixelmon.max_effective": "Сверхэфф. (4x)",
+  "pixelmon.not_effective": "Не очень эфф. (0.5x)",
+  "pixelmon.barely_effective": "Едва эфф. (0.25x)",
+  "pixelmon.none_effective": "Не действует (0x)"
+}
