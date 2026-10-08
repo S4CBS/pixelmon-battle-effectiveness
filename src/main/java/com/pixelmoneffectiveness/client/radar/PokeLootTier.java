@@ -1,6 +1,7 @@
 package com.pixelmoneffectiveness.client.radar;
 
 import com.pixelmonmod.pixelmon.blocks.enums.EnumPokeChestType;
+import com.pixelmoneffectiveness.config.EffectivenessConfig;
 import net.minecraft.network.chat.Component;
 
 public enum PokeLootTier {
@@ -44,6 +45,32 @@ public enum PokeLootTier {
 
     public int getPriority() {
         return priority;
+    }
+
+    public boolean isSearchEnabled() {
+        if (EffectivenessConfig.CONFIG == null) return true;
+        return switch (this) {
+            case MASTER -> EffectivenessConfig.CONFIG.searchMaster.get();
+            case BEAST -> EffectivenessConfig.CONFIG.searchBeast.get();
+            case ULTRA -> EffectivenessConfig.CONFIG.searchUltra.get();
+            case SPECIAL -> EffectivenessConfig.CONFIG.searchSpecial.get();
+            case POKE -> EffectivenessConfig.CONFIG.searchPoke.get() && !EffectivenessConfig.CONFIG.radarFilterNormalPoke.get();
+        };
+    }
+
+    public void setSearchEnabled(boolean enabled) {
+        if (EffectivenessConfig.CONFIG == null) return;
+        switch (this) {
+            case MASTER -> EffectivenessConfig.CONFIG.searchMaster.set(enabled);
+            case BEAST -> EffectivenessConfig.CONFIG.searchBeast.set(enabled);
+            case ULTRA -> EffectivenessConfig.CONFIG.searchUltra.set(enabled);
+            case SPECIAL -> EffectivenessConfig.CONFIG.searchSpecial.set(enabled);
+            case POKE -> {
+                EffectivenessConfig.CONFIG.searchPoke.set(enabled);
+                EffectivenessConfig.CONFIG.radarFilterNormalPoke.set(!enabled);
+            }
+        }
+        EffectivenessConfig.SPEC.save();
     }
 
     public static PokeLootTier fromChestType(EnumPokeChestType type) {

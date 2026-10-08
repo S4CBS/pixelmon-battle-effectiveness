@@ -38,10 +38,24 @@ public class PokeLootRadarClient {
         "key.categories.pixelmoneffectiveness"
     );
 
+    public static final KeyMapping OPEN_GUI_KEY = new KeyMapping(
+        "key.pixelmoneffectiveness.open_radar_gui",
+        75, // GLFW_KEY_K
+        "key.categories.pixelmoneffectiveness"
+    );
+
     private static boolean radarActive = true;
     private static int scanCooldown = 0;
     private static List<PokeLootEntry> cachedEntries = new ArrayList<>();
     private static final Set<BlockPos> knownHighTierPositions = new HashSet<>();
+
+    public static boolean isRadarActive() {
+        return radarActive;
+    }
+
+    public static void setRadarActive(boolean active) {
+        radarActive = active;
+    }
 
     public static void init(IEventBus modEventBus) {
         modEventBus.addListener(PokeLootRadarClient::onRegisterKeyMappings);
@@ -52,6 +66,7 @@ public class PokeLootRadarClient {
 
     public static void onRegisterKeyMappings(RegisterKeyMappingsEvent event) {
         event.register(TOGGLE_KEY);
+        event.register(OPEN_GUI_KEY);
     }
 
     public static void onClientTick(ClientTickEvent.Post event) {
@@ -61,13 +76,21 @@ public class PokeLootRadarClient {
             return;
         }
 
+        while (OPEN_GUI_KEY.consumeClick()) {
+            mc.setScreen(new PokeLootRadarScreen());
+        }
+
         while (TOGGLE_KEY.consumeClick()) {
-            radarActive = !radarActive;
-            boolean isRu = mc.getLanguageManager().getSelected().toLowerCase(Locale.ROOT).startsWith("ru");
-            String text = radarActive
-                ? (isRu ? "§e[Радар покелутов] §aВключен" : "§e[PokéLoot Radar] §aEnabled")
-                : (isRu ? "§e[Радар покелутов] §cВыключен" : "§e[PokéLoot Radar] §cDisabled");
-            mc.player.displayClientMessage(Component.literal(text), true);
+            if (net.minecraft.client.gui.screens.Screen.hasShiftDown()) {
+                mc.setScreen(new PokeLootRadarScreen());
+            } else {
+                radarActive = !radarActive;
+                boolean isRu = mc.getLanguageManager().getSelected().toLowerCase(Locale.ROOT).startsWith("ru");
+                String text = radarActive
+                    ? (isRu ? "§e[Радар покелутов] §aВключен §7(K - настройки)" : "§e[PokéLoot Radar] §aEnabled §7(K for settings)")
+                    : (isRu ? "§e[Радар покелутов] §cВыключен §7(K - настройки)" : "§e[PokéLoot Radar] §cDisabled §7(K for settings)");
+                mc.player.displayClientMessage(Component.literal(text), true);
+            }
         }
 
         if (!radarActive || (EffectivenessConfig.CONFIG != null && !EffectivenessConfig.CONFIG.radarEnabled.get())) {
@@ -112,13 +135,14 @@ public class PokeLootRadarClient {
                         EnumPokeChestType type = chest.getChestType();
                         PokeLootTier tier = PokeLootTier.fromChestType(type);
 
-                        if (EffectivenessConfig.CONFIG != null && EffectivenessConfig.CONFIG.radarFilterNormalPoke.get()) {
-                            if (tier == PokeLootTier.POKE) {
-                                continue;
-                            }
+                        if (!tier.isSearchEnabled()) {
+                            continue;
                         }
 
                         boolean isHidden = (chest.getVisibility() == EnumPokechestVisibility.Hidden);
+                        if (isHidden && EffectivenessConfig.CONFIG != null && !EffectivenessConfig.CONFIG.searchHidden.get()) {
+                            continue;
+                        }
                         double dx = pos.getX() + 0.5 - player.getX();
                         double dy = pos.getY() + 0.5 - player.getY();
                         double dz = pos.getZ() + 0.5 - player.getZ();

@@ -7,5 +7,6 @@
   "pixelmoneffectiveness.none": "Immune (0x)",
   "pixelmoneffectiveness.apricorn.harvested": "§aHarvested %s apricorns",
   "key.pixelmoneffectiveness.toggle_radar": "Toggle PokéLoot Radar",
+  "key.pixelmoneffectiveness.open_radar_gui": "PokéLoot Radar Settings",
   "key.categories.pixelmoneffectiveness": "Pixelmon Utilities"
 }

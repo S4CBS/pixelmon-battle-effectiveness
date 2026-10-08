@@ -20,6 +20,13 @@ public class EffectivenessConfig {
     public final ModConfigSpec.BooleanValue radarSoundAlert;
     public final ModConfigSpec.BooleanValue radarFilterNormalPoke;
 
+    public final ModConfigSpec.BooleanValue searchMaster;
+    public final ModConfigSpec.BooleanValue searchBeast;
+    public final ModConfigSpec.BooleanValue searchUltra;
+    public final ModConfigSpec.BooleanValue searchSpecial;
+    public final ModConfigSpec.BooleanValue searchPoke;
+    public final ModConfigSpec.BooleanValue searchHidden;
+
     public EffectivenessConfig(ModConfigSpec.Builder builder) {
         builder.push("general");
 
@@ -81,6 +88,36 @@ public class EffectivenessConfig {
             .comment("Скрывать обычные (красные) поке-луты, отображая только Ультра, Мастер, Бист и Спец.",
                      "Hide normal (red) poké loot, only showing Ultra, Master, Beast, and Special loot.")
             .define("filterNormalPoke", false);
+
+        searchMaster = builder
+            .comment("Искать Мастер-лут (Master Ball).",
+                     "Search for Master loot (Master Ball).")
+            .define("searchMaster", true);
+
+        searchBeast = builder
+            .comment("Искать Бист-лут (Beast Ball).",
+                     "Search for Beast loot (Beast Ball).")
+            .define("searchBeast", true);
+
+        searchUltra = builder
+            .comment("Искать Ультра-лут (Ultra Ball).",
+                     "Search for Ultra loot (Ultra Ball).")
+            .define("searchUltra", true);
+
+        searchSpecial = builder
+            .comment("Искать Спец-лут (Special Poké Chest).",
+                     "Search for Special loot (Special Poké Chest).")
+            .define("searchSpecial", true);
+
+        searchPoke = builder
+            .comment("Искать обычный Поке-лут (Poké Ball).",
+                     "Search for regular Poké loot (Poké Ball).")
+            .define("searchPoke", true);
+
+        searchHidden = builder
+            .comment("Искать скрытый лут (невидимые сундуки-покеболы).",
+                     "Search for hidden Poké chests (invisible pokeballs).")
+            .define("searchHidden", true);
 
         builder.pop();
     }
