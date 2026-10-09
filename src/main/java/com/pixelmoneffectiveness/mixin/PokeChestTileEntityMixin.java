@@ -1,5 +1,7 @@
 package com.pixelmoneffectiveness.mixin;
 
+import com.pixelmonmod.pixelmon.api.config.EnumPokelootModes;
+import com.pixelmonmod.pixelmon.api.config.PixelmonConfigProxy;
 import com.pixelmonmod.pixelmon.api.util.LootClaim;
 import com.pixelmonmod.pixelmon.blocks.tileentity.PokeChestTileEntity;
 import net.minecraft.core.HolderLookup;
@@ -10,8 +12,10 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.List;
+import java.util.UUID;
 
 @Mixin(PokeChestTileEntity.class)
 public abstract class PokeChestTileEntityMixin {
@@ -30,6 +34,59 @@ public abstract class PokeChestTileEntityMixin {
 
     @Shadow
     private boolean manualControl;
+
+    /**
+     * Prevents naturally spawned PokéChests from breaking/disappearing if the configured
+     * spawn-mode is not one-time use (e.g. TIMED, PL, PU).
+     */
+    @Inject(method = "shouldBreakBlock", at = @At("HEAD"), cancellable = true)
+    private void pixelmonEffectiveness$preventBreak(CallbackInfoReturnable<Boolean> cir) {
+        if (!this.manualControl) {
+            try {
+                EnumPokelootModes mode = PixelmonConfigProxy.getSpawningPokeLoot().getSpawnMode();
+                if (mode != null && !mode.isOneTimeUse()) {
+                    cir.setReturnValue(false);
+                }
+            } catch (Throwable ignored) {
+                cir.setReturnValue(false);
+            }
+        }
+    }
+
+    /**
+     * Ensures naturally spawned PokéChests always use the configured spawn-mode settings
+     * (e.g. TIMED cooldowns) whenever claim eligibility is checked.
+     */
+    @Inject(method = "canClaim", at = @At("HEAD"))
+    private void pixelmonEffectiveness$ensureModeOnCanClaim(UUID uuid, CallbackInfoReturnable<Boolean> cir) {
+        if (!this.manualControl) {
+            try {
+                EnumPokelootModes mode = PixelmonConfigProxy.getSpawningPokeLoot().getSpawnMode();
+                if (mode != null) {
+                    this.chestOneTime = mode.isOneTimeUse();
+                    this.dropOneTime = mode.isOncePerPlayer();
+                    this.timeEnabled = mode.isTimeEnabled();
+                }
+            } catch (Throwable ignored) {}
+        }
+    }
+
+    /**
+     * Ensures mode settings are up-to-date before syncing to client packets.
+     */
+    @Inject(method = "writeToNBTClient", at = @At("HEAD"))
+    private void pixelmonEffectiveness$ensureModeBeforeClientSync(CompoundTag tag, HolderLookup.Provider provider, CallbackInfo ci) {
+        if (!this.manualControl) {
+            try {
+                EnumPokelootModes mode = PixelmonConfigProxy.getSpawningPokeLoot().getSpawnMode();
+                if (mode != null) {
+                    this.chestOneTime = mode.isOneTimeUse();
+                    this.dropOneTime = mode.isOncePerPlayer();
+                    this.timeEnabled = mode.isTimeEnabled();
+                }
+            } catch (Throwable ignored) {}
+        }
+    }
 
     /**
      * Syncs chest cooldown claims and time settings to client packets so the client
@@ -65,11 +122,21 @@ public abstract class PokeChestTileEntityMixin {
     }
 
     /**
-     * Reads the synced claims on the client when chunk is loaded.
+     * When a chest is loaded from disk on the server, ensure naturally spawned chests
+     * adopt the config spawn-mode, and do NOT get overridden with outdated NBT values.
      */
     @Inject(method = "loadAdditional", at = @At("TAIL"))
-    private void pixelmonEffectiveness$readClaimFromLoadAdditional(CompoundTag tag, HolderLookup.Provider provider, CallbackInfo ci) {
-        pixelmonEffectiveness$readClaims(tag);
+    private void pixelmonEffectiveness$onLoadAdditional(CompoundTag tag, HolderLookup.Provider provider, CallbackInfo ci) {
+        if (!this.manualControl) {
+            try {
+                EnumPokelootModes mode = PixelmonConfigProxy.getSpawningPokeLoot().getSpawnMode();
+                if (mode != null) {
+                    this.chestOneTime = mode.isOneTimeUse();
+                    this.dropOneTime = mode.isOncePerPlayer();
+                    this.timeEnabled = mode.isTimeEnabled();
+                }
+            } catch (Throwable ignored) {}
+        }
     }
 
     private void pixelmonEffectiveness$readClaims(CompoundTag tag) {
@@ -88,17 +155,28 @@ public abstract class PokeChestTileEntityMixin {
                 }
             }
         }
-        if (tag.contains("timeEnabled")) {
-            this.timeEnabled = tag.getBoolean("timeEnabled");
-        }
-        if (tag.contains("dropOneTime")) {
-            this.dropOneTime = tag.getBoolean("dropOneTime");
-        }
-        if (tag.contains("chestOneTime")) {
-            this.chestOneTime = tag.getBoolean("chestOneTime");
-        }
         if (tag.contains("manualControl")) {
             this.manualControl = tag.getBoolean("manualControl");
+        }
+        if (!this.manualControl) {
+            try {
+                EnumPokelootModes mode = PixelmonConfigProxy.getSpawningPokeLoot().getSpawnMode();
+                if (mode != null) {
+                    this.chestOneTime = mode.isOneTimeUse();
+                    this.dropOneTime = mode.isOncePerPlayer();
+                    this.timeEnabled = mode.isTimeEnabled();
+                }
+            } catch (Throwable ignored) {}
+        } else {
+            if (tag.contains("timeEnabled")) {
+                this.timeEnabled = tag.getBoolean("timeEnabled");
+            }
+            if (tag.contains("dropOneTime")) {
+                this.dropOneTime = tag.getBoolean("dropOneTime");
+            }
+            if (tag.contains("chestOneTime")) {
+                this.chestOneTime = tag.getBoolean("chestOneTime");
+            }
         }
     }
 }
