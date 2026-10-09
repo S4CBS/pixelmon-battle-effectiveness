@@ -14,9 +14,11 @@ def build():
                     continue
                 jars.append(os.path.join(root, f))
 
-    pixelmon_jar = os.path.join(appdata, 'mods', 'Pixelmon-1.21.1-9.4.1-universal.jar')
-    if os.path.exists(pixelmon_jar):
-        jars.append(pixelmon_jar)
+    mods_dir = os.path.join(appdata, 'mods')
+    if os.path.exists(mods_dir):
+        for f in os.listdir(mods_dir):
+            if f.endswith('.jar') and not f.startswith('PixelmonEffectiveness'):
+                jars.append(os.path.join(mods_dir, f))
 
     cp = os.pathsep.join(jars)
 
