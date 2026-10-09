@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import com.pixelmonmod.pixelmon.Pixelmon;
 import com.pixelmonmod.pixelmon.api.events.PokeLootEvent;
+import com.pixelmonmod.pixelmon.api.util.LootClaim;
 import com.pixelmonmod.pixelmon.blocks.enums.EnumPokeChestType;
 import com.pixelmonmod.pixelmon.blocks.enums.EnumPokechestVisibility;
 import com.pixelmonmod.pixelmon.blocks.tileentity.PokeChestTileEntity;
@@ -22,10 +23,10 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.client.event.ClientChatReceivedEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.event.RenderGuiEvent;
@@ -64,12 +65,16 @@ public class PokeLootRadarClient {
         radarActive = active;
     }
 
+    private static BlockPos lastClickedChestPos = null;
+    private static long lastClickedChestTime = 0;
+
     public static void init(IEventBus modEventBus) {
         modEventBus.addListener(PokeLootRadarClient::onRegisterKeyMappings);
         NeoForge.EVENT_BUS.addListener(PokeLootRadarClient::onClientTick);
         NeoForge.EVENT_BUS.addListener(PokeLootRadarClient::onRenderGui);
         NeoForge.EVENT_BUS.addListener(PokeLootRadarClient::onRenderLevelStage);
         NeoForge.EVENT_BUS.addListener(PokeLootRadarClient::onRightClickBlock);
+        NeoForge.EVENT_BUS.addListener(PokeLootRadarClient::onClientChatReceived);
         Pixelmon.EVENT_BUS.addListener(PokeLootRadarClient::onPokeLootClaim);
     }
 
@@ -115,9 +120,8 @@ public class PokeLootRadarClient {
         }
     }
 
-    public static void onPokeLootClaim(PokeLootEvent.Claim event) {
-        if (event.chest == null) return;
-        BlockPos pos = event.chest.getBlockPos();
+    public static void markChestCooldown(BlockPos pos) {
+        if (pos == null) return;
         long lootTimeHours = 24;
         try {
             if (com.pixelmonmod.pixelmon.api.config.PixelmonConfigProxy.getSpawningPokeLoot() != null) {
@@ -129,14 +133,60 @@ public class PokeLootRadarClient {
         cachedEntries.removeIf(e -> e.pos.equals(pos));
     }
 
+    public static void onPokeLootClaim(PokeLootEvent.Claim event) {
+        if (event.chest == null) return;
+        markChestCooldown(event.chest.getBlockPos());
+    }
+
     public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
+        BlockPos pos = event.getPos();
         if (event.getLevel().isClientSide()) {
-            BlockPos pos = event.getPos();
             Minecraft mc = Minecraft.getInstance();
-            if (mc.player != null && event.getLevel().getBlockEntity(pos) instanceof PokeChestTileEntity chest) {
-                if (isChestOnCooldown(mc, pos, chest)) {
-                    localCooldownMap.put(pos, System.currentTimeMillis() + 60000L);
-                    cachedEntries.removeIf(e -> e.pos.equals(pos));
+            if (mc.player != null && event.getLevel().getBlockEntity(pos) instanceof PokeChestTileEntity clientChest) {
+                lastClickedChestPos = pos;
+                lastClickedChestTime = System.currentTimeMillis();
+                if (!clientChest.canClaim(mc.player.getUUID())) {
+                    markChestCooldown(pos);
+                }
+            }
+        } else {
+            // Server side check (runs in singleplayer)
+            try {
+                if (event.getLevel().getBlockEntity(pos) instanceof PokeChestTileEntity sChest) {
+                    if (!sChest.canClaim(event.getEntity().getUUID())) {
+                        markChestCooldown(pos);
+                        if (event.getLevel() instanceof ServerLevel sLevel) {
+                            sLevel.sendBlockUpdated(pos, sChest.getBlockState(), sChest.getBlockState(), 3);
+                        }
+                    }
+                }
+            } catch (Throwable ignored) {}
+        }
+    }
+
+    public static void onClientChatReceived(ClientChatReceivedEvent event) {
+        if (event.getMessage() == null) return;
+        String text = event.getMessage().getString().toLowerCase(Locale.ROOT);
+        if (text.contains("собрали этот покелут") || text.contains("попробуйте ещё раз позже")
+            || text.contains("попробуйте еще раз позже") || text.contains("already claimed")
+            || text.contains("timedclaim") || text.contains("claimedloot")) {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.player != null) {
+                if (lastClickedChestPos != null && (System.currentTimeMillis() - lastClickedChestTime < 4000)) {
+                    markChestCooldown(lastClickedChestPos);
+                } else {
+                    BlockPos closest = null;
+                    double closestDistSq = 36.0;
+                    for (PokeLootEntry entry : cachedEntries) {
+                        double dsq = entry.pos.distToCenterSqr(mc.player.position());
+                        if (dsq < closestDistSq) {
+                            closestDistSq = dsq;
+                            closest = entry.pos;
+                        }
+                    }
+                    if (closest != null) {
+                        markChestCooldown(closest);
+                    }
                 }
             }
         }
@@ -165,26 +215,21 @@ public class PokeLootRadarClient {
                 if (!clientChest.canClaim(playerUUID)) {
                     return true;
                 }
-            } catch (Throwable ignored) {}
-        }
-
-        // 3. In Singleplayer, check server tile entity directly
-        try {
-            if (mc.getSingleplayerServer() != null && mc.level != null) {
-                ServerLevel sLevel = mc.getSingleplayerServer().getLevel(mc.level.dimension());
-                if (sLevel != null) {
-                    ChunkAccess sChunk = sLevel.getChunkSource().getChunkNow(pos.getX() >> 4, pos.getZ() >> 4);
-                    if (sChunk != null) {
-                        BlockEntity sBe = sChunk.getBlockEntity(pos);
-                        if (sBe instanceof PokeChestTileEntity sChest) {
-                            if (!sChest.canClaim(playerUUID)) {
-                                return true;
-                            }
+                LootClaim claim = clientChest.getLootClaim(playerUUID);
+                if (claim != null) {
+                    long lootTimeHours = 24;
+                    try {
+                        if (com.pixelmonmod.pixelmon.api.config.PixelmonConfigProxy.getSpawningPokeLoot() != null) {
+                            lootTimeHours = com.pixelmonmod.pixelmon.api.config.PixelmonConfigProxy.getSpawningPokeLoot().getLootTime();
                         }
+                    } catch (Throwable ignored) {}
+                    long elapsedMs = System.currentTimeMillis() - claim.getTimeClaimed();
+                    if (elapsedMs < lootTimeHours * 3600 * 1000L) {
+                        return true;
                     }
                 }
-            }
-        } catch (Throwable ignored) {}
+            } catch (Throwable ignored) {}
+        }
 
         return false;
     }
@@ -260,7 +305,13 @@ public class PokeLootRadarClient {
         Player player = mc.player;
         if (player == null) return;
 
-        cachedEntries.removeIf(entry -> isChestOnCooldown(mc, entry.pos, null));
+        cachedEntries.removeIf(entry -> {
+            PokeChestTileEntity chest = null;
+            if (mc.level != null && mc.level.getBlockEntity(entry.pos) instanceof PokeChestTileEntity c) {
+                chest = c;
+            }
+            return isChestOnCooldown(mc, entry.pos, chest);
+        });
 
         for (PokeLootEntry entry : cachedEntries) {
             double dx = entry.pos.getX() + 0.5 - player.getX();

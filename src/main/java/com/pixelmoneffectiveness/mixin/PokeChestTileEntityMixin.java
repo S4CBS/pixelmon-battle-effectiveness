@@ -25,14 +25,20 @@ public abstract class PokeChestTileEntityMixin {
     @Shadow
     private boolean dropOneTime;
 
+    @Shadow
+    private boolean chestOneTime;
+
+    @Shadow
+    private boolean manualControl;
+
     /**
      * Syncs chest cooldown claims and time settings to client packets so the client
      * radar can know when a chest is on cooldown.
      */
     @Inject(method = "writeToNBTClient", at = @At("TAIL"))
     private void pixelmonEffectiveness$syncClaimToClient(CompoundTag tag, HolderLookup.Provider provider, CallbackInfo ci) {
-        if (this.claimed != null && !this.claimed.isEmpty()) {
-            ListTag listTag = new ListTag();
+        ListTag listTag = new ListTag();
+        if (this.claimed != null) {
             for (LootClaim claim : this.claimed) {
                 if (claim != null && claim.getPlayerID() != null) {
                     CompoundTag claimTag = new CompoundTag();
@@ -41,27 +47,44 @@ public abstract class PokeChestTileEntityMixin {
                     listTag.add(claimTag);
                 }
             }
-            tag.put("claimed", listTag);
         }
+        tag.put("claimedPlayers", listTag);
+        tag.put("claimed", listTag);
         tag.putBoolean("timeEnabled", this.timeEnabled);
         tag.putBoolean("dropOneTime", this.dropOneTime);
+        tag.putBoolean("chestOneTime", this.chestOneTime);
+        tag.putBoolean("manualControl", this.manualControl);
     }
 
     /**
-     * Reads the synced claims on the client so that client canClaim(...) checks return false
-     * when the local player is on cooldown.
+     * Reads the synced claims on the client from network packets.
      */
     @Inject(method = "readFromNBTClient", at = @At("TAIL"))
     private void pixelmonEffectiveness$readClaimFromClient(CompoundTag tag, HolderLookup.Provider provider, CallbackInfo ci) {
-        if (tag.contains("claimed", 9)) {
-            if (this.claimed != null) {
+        pixelmonEffectiveness$readClaims(tag);
+    }
+
+    /**
+     * Reads the synced claims on the client when chunk is loaded.
+     */
+    @Inject(method = "loadAdditional", at = @At("TAIL"))
+    private void pixelmonEffectiveness$readClaimFromLoadAdditional(CompoundTag tag, HolderLookup.Provider provider, CallbackInfo ci) {
+        pixelmonEffectiveness$readClaims(tag);
+    }
+
+    private void pixelmonEffectiveness$readClaims(CompoundTag tag) {
+        String key = tag.contains("claimedPlayers", 9) ? "claimedPlayers" : (tag.contains("claimed", 9) ? "claimed" : null);
+        if (key != null) {
+            if (this.claimed == null) {
+                this.claimed = new java.util.ArrayList<>();
+            } else {
                 this.claimed.clear();
-                ListTag listTag = tag.getList("claimed", 10);
-                for (int i = 0; i < listTag.size(); i++) {
-                    CompoundTag claimTag = listTag.getCompound(i);
-                    if (claimTag.hasUUID("Claimer")) {
-                        this.claimed.add(new LootClaim(claimTag.getUUID("Claimer"), claimTag.getLong("timeClaimed")));
-                    }
+            }
+            ListTag listTag = tag.getList(key, 10);
+            for (int i = 0; i < listTag.size(); i++) {
+                CompoundTag claimTag = listTag.getCompound(i);
+                if (claimTag.hasUUID("Claimer")) {
+                    this.claimed.add(new LootClaim(claimTag.getUUID("Claimer"), claimTag.getLong("timeClaimed")));
                 }
             }
         }
@@ -70,6 +93,12 @@ public abstract class PokeChestTileEntityMixin {
         }
         if (tag.contains("dropOneTime")) {
             this.dropOneTime = tag.getBoolean("dropOneTime");
+        }
+        if (tag.contains("chestOneTime")) {
+            this.chestOneTime = tag.getBoolean("chestOneTime");
+        }
+        if (tag.contains("manualControl")) {
+            this.manualControl = tag.getBoolean("manualControl");
         }
     }
 }
