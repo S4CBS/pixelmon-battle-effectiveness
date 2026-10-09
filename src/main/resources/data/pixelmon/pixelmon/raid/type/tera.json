@@ -1,0 +1,136 @@
+{
+  "render_options": {
+    "den_model": {
+      "models": {
+        "smooth": [
+          {
+            "model_type": "pixelmon:smd",
+            "model": "pixelmon:block/den/tera_raid_den.bmd",
+            "texture": "pixelmon:block/den/tera_raid_den.png",
+            "scale": 0.12
+          }
+        ]
+      },
+      "model_predicate": {
+        "type": "pixelmon:always"
+      }
+    },
+    "den_model_effect": {
+      "type": "pixelmon:tera_crystal",
+      "gem_materials": [
+        "gem"
+      ]
+    },
+    "den_beam": {
+      "type": "pixelmon:tera"
+    },
+    "den_particles": {
+      "type": "pixelmon:tera_dust"
+    },
+    "emissive_when_active": true,
+    "active_light_level": 15,
+    "tint_base": true,
+    "base_transparency": 0.85
+  },
+  "hitbox": [
+    1.1,
+    3.25
+  ],
+  "eligible_spawns": "#pixelmon:tera",
+  "eligible_allies": "#pixelmon:tera",
+  "admin_items": "#pixelmon:raid/admin/tera",
+  "spawn_strategy": {
+    "type": "pixelmon:config_once_a_day"
+  },
+  "battle_start_strategy": {
+    "type": "pixelmon:tera"
+  },
+  "raid_strategies": [
+    {
+      "type": "pixelmon:tera_progress",
+      "time_limit_seconds": 480,
+      "faint_time_penalty_seconds": 30
+    },
+    {
+      "type": "pixelmon:tera_pokemon_modifier"
+    },
+    {
+      "type": "pixelmon:tera_boss_tier",
+      "boss_tier": "equal"
+    },
+    {
+      "type": "pixelmon:tera_gimmick"
+    },
+    {
+      "type": "pixelmon:tera_battle_ai"
+    },
+    {
+      "type": "pixelmon:tera_cheer",
+      "max_cheers": 3,
+      "heal_percent": 100.0,
+      "stat_boost_stages": 1
+    },
+    {
+      "type": "pixelmon:tera_charge",
+      "attacks_to_charge": 3,
+      "starting_charge": 0
+    },
+    {
+      "type": "pixelmon:tera_attack"
+    },
+    {
+      "type": "pixelmon:tera_boss_action",
+      "actions": [
+        {
+          "trigger": "time_at_or_after",
+          "action": "steal_tera_charge",
+          "time_seconds": 144,
+          "amount": 1
+        },
+        {
+          "trigger": "health_at_or_below",
+          "action": "reset_boss_negative_stats",
+          "hp_threshold": 75.0
+        },
+        {
+          "trigger": "health_at_or_below",
+          "action": "reset_player_stats",
+          "hp_threshold": 50.0
+        },
+        {
+          "trigger": "shield_active",
+          "action": "clear_boss_status"
+        },
+        {
+          "trigger": "health_at_or_below",
+          "action": "nullify_player_abilities",
+          "hp_threshold": 35.0
+        }
+      ]
+    },
+    {
+      "type": "pixelmon:tera_shield",
+      "shield_hp_threshold": 50.0,
+      "shield_time_threshold_seconds": 288,
+      "shield_health": 100.0,
+      "shield_segments": 8,
+      "normal_damage_multiplier": 0.2,
+      "terastallized_damage_multiplier": 0.35,
+      "matching_tera_damage_multiplier": 0.75
+    },
+    {
+      "type": "pixelmon:tera_revive",
+      "base_revive_seconds": 5,
+      "extra_seconds_per_faint": 5,
+      "max_revive_seconds": 30
+    }
+  ],
+  "intent_handlers": {
+    "pixelmon:selected_pokemon": "pixelmon:selected_pokemon",
+    "pixelmon:start_solo": "pixelmon:start_solo",
+    "pixelmon:start_multiplayer": "pixelmon:start_multiplayer",
+    "pixelmon:multiplayer": "pixelmon:multiplayer",
+    "pixelmon:quit": "pixelmon:quit",
+    "pixelmon:catch": "pixelmon:catch"
+  }
+}
