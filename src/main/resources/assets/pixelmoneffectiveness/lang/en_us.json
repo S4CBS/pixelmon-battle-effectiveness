@@ -6,6 +6,7 @@
   "pixelmoneffectiveness.barely": "Barely Eff. (0.25x)",
   "pixelmoneffectiveness.none": "Immune (0x)",
   "pixelmoneffectiveness.apricorn.harvested": "§aHarvested %s apricorns",
+  "pixelmoneffectiveness.berry.harvested": "§aHarvested %s berries",
   "key.pixelmoneffectiveness.toggle_radar": "Toggle PokéLoot Radar",
   "key.pixelmoneffectiveness.open_radar_gui": "PokéLoot Radar Settings",
   "key.pixelmoneffectiveness.open_overlay_settings": "Pokémon Info Overlay Settings",

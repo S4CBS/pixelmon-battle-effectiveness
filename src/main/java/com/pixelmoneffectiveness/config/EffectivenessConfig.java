@@ -63,8 +63,8 @@ public class EffectivenessConfig {
             .define("showForStatusMoves", false);
 
         apricornHarvestEnabled = builder
-            .comment("Включить быстрый сбор всех априкорнов с дерева при нажатии Shift + ПКМ по стволу или листве.",
-                     "Enable harvesting all apricorns from a tree when Shift + Right-Clicking the trunk or leaves.")
+            .comment("Включить быстрый сбор всех априкорнов и ягод с дерева при нажатии Shift + ПКМ по стволу или листве.",
+                     "Enable harvesting all apricorns and berries from a tree when Shift + Right-Clicking the trunk or leaves.")
             .define("apricornHarvestEnabled", true);
 
         builder.pop();

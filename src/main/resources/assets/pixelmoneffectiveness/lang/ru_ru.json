@@ -6,6 +6,7 @@
   "pixelmoneffectiveness.barely": "Едва эфф. (0.25x)",
   "pixelmoneffectiveness.none": "Не действует (0x)",
   "pixelmoneffectiveness.apricorn.harvested": "§aСобрано априкорнов: %s",
+  "pixelmoneffectiveness.berry.harvested": "§aСобрано ягод: %s",
   "key.pixelmoneffectiveness.toggle_radar": "Вкл/Выкл радар PokéLoot",
   "key.pixelmoneffectiveness.open_radar_gui": "Настройки радара PokéLoot",
   "key.pixelmoneffectiveness.open_overlay_settings": "Настройки инфо-панели покемона",

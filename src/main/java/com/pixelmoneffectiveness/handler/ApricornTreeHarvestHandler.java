@@ -2,7 +2,11 @@ package com.pixelmoneffectiveness.handler;
 
 import com.pixelmonmod.pixelmon.Pixelmon;
 import com.pixelmonmod.pixelmon.api.events.ApricornEvent;
+import com.pixelmonmod.pixelmon.api.events.BerryEvent;
 import com.pixelmonmod.pixelmon.blocks.ApricornLeavesBlock;
+import com.pixelmonmod.pixelmon.blocks.BerryLeavesBlock;
+import com.pixelmonmod.pixelmon.blocks.BerryLogBlock;
+import com.pixelmonmod.pixelmon.enums.BerryType;
 import com.pixelmonmod.pixelmon.enums.items.ApricornType;
 import com.pixelmonmod.pixelmon.init.registry.BlockRegistration;
 import com.pixelmoneffectiveness.config.EffectivenessConfig;
@@ -20,14 +24,21 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 
+import java.lang.reflect.Field;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 
 public class ApricornTreeHarvestHandler {
+
+    private static final Map<Block, BerryType> BERRY_LEAVES_MAP = new HashMap<>();
+    private static Field berryField = null;
+    private static boolean berryFieldLookupDone = false;
 
     public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
         if (event.getHand() != InteractionHand.MAIN_HAND) {
@@ -48,13 +59,20 @@ public class ApricornTreeHarvestHandler {
         BlockState clickedState = level.getBlockState(startPos);
         Block clickedBlock = clickedState.getBlock();
 
-        boolean isLog = isApricornLog(clickedBlock);
-        boolean isLeaves = clickedBlock instanceof ApricornLeavesBlock;
-        if (!isLog && !isLeaves) {
-            return;
-        }
+        boolean isApricornLog = isApricornLog(clickedBlock);
+        boolean isApricornLeaves = clickedBlock instanceof ApricornLeavesBlock;
+        boolean isBerryLog = isBerryLog(clickedBlock);
+        boolean isBerryLeaves = clickedBlock instanceof BerryLeavesBlock;
 
-        List<BlockPos> ripeLeaves = findTreeRipeLeaves(level, startPos);
+        if (isApricornLog || isApricornLeaves) {
+            handleApricornHarvest(event, player, level, startPos);
+        } else if (isBerryLog || isBerryLeaves) {
+            handleBerryHarvest(event, player, level, startPos);
+        }
+    }
+
+    private static void handleApricornHarvest(PlayerInteractEvent.RightClickBlock event, Player player, Level level, BlockPos startPos) {
+        List<BlockPos> ripeLeaves = findTreeRipeApricornLeaves(level, startPos);
         if (ripeLeaves.isEmpty()) {
             return;
         }
@@ -125,8 +143,84 @@ public class ApricornTreeHarvestHandler {
         }
     }
 
+    private static void handleBerryHarvest(PlayerInteractEvent.RightClickBlock event, Player player, Level level, BlockPos startPos) {
+        List<BlockPos> ripeLeaves = findTreeRipeBerryLeaves(level, startPos);
+        if (ripeLeaves.isEmpty()) {
+            return;
+        }
+
+        // On client: swing arm and cancel event to synchronize animation and prevent unwanted block placing
+        if (level.isClientSide) {
+            player.swing(InteractionHand.MAIN_HAND, true);
+            event.setCanceled(true);
+            event.setCancellationResult(InteractionResult.SUCCESS);
+            return;
+        }
+
+        // On server: harvest all ripe berries
+        ServerPlayer serverPlayer = (player instanceof ServerPlayer sp) ? sp : null;
+        int harvestedCount = 0;
+
+        for (BlockPos leafPos : ripeLeaves) {
+            BlockState leafState = level.getBlockState(leafPos);
+            if (!(leafState.getBlock() instanceof BerryLeavesBlock leavesBlock)) {
+                continue;
+            }
+            if (!leafState.hasProperty(BerryLeavesBlock.AGE) || leafState.getValue(BerryLeavesBlock.AGE) < 2) {
+                continue;
+            }
+
+            BerryType berryType = getBerryType(leavesBlock);
+            if (berryType == null) {
+                continue;
+            }
+
+            ItemStack drop = new ItemStack(berryType.getBerryItem());
+
+            if (serverPlayer != null) {
+                BerryEvent.Pick pickEvent = new BerryEvent.Pick(level, leafState, berryType, leafPos, serverPlayer, drop);
+                Pixelmon.EVENT_BUS.post(pickEvent);
+                if (pickEvent.isCanceled()) {
+                    continue;
+                }
+                drop = pickEvent.getPickedStack();
+            }
+
+            level.setBlockAndUpdate(leafPos, leafState.setValue(BerryLeavesBlock.AGE, 0));
+            harvestedCount++;
+
+            if (!player.addItem(drop)) {
+                player.drop(drop, false);
+            }
+        }
+
+        if (harvestedCount > 0) {
+            level.playSound(
+                null,
+                player.getX(),
+                player.getY(),
+                player.getZ(),
+                SoundEvents.SWEET_BERRY_BUSH_PICK_BERRIES,
+                SoundSource.PLAYERS,
+                1.0F,
+                1.0F
+            );
+            player.displayClientMessage(
+                Component.translatable("pixelmoneffectiveness.berry.harvested", harvestedCount),
+                true
+            );
+            player.swing(InteractionHand.MAIN_HAND, true);
+            event.setCanceled(true);
+            event.setCancellationResult(InteractionResult.SUCCESS);
+        }
+    }
+
     private static boolean isApricornLog(Block block) {
         return block == BlockRegistration.APRICORN_LOG.get();
+    }
+
+    private static boolean isBerryLog(Block block) {
+        return block instanceof BerryLogBlock || block == BlockRegistration.BERRY_LOG.get();
     }
 
     private static ApricornType getApricornType(ApricornLeavesBlock leavesBlock) {
@@ -138,7 +232,43 @@ public class ApricornTreeHarvestHandler {
         return null;
     }
 
-    private static List<BlockPos> findTreeRipeLeaves(Level level, BlockPos origin) {
+    private static BerryType getBerryType(BerryLeavesBlock leavesBlock) {
+        BerryType cached = BERRY_LEAVES_MAP.get(leavesBlock);
+        if (cached != null) {
+            return cached;
+        }
+
+        if (!berryFieldLookupDone) {
+            berryFieldLookupDone = true;
+            try {
+                berryField = BerryLeavesBlock.class.getDeclaredField("berry");
+                berryField.setAccessible(true);
+            } catch (Throwable ignored) {}
+        }
+
+        if (berryField != null) {
+            try {
+                BerryType type = (BerryType) berryField.get(leavesBlock);
+                if (type != null) {
+                    BERRY_LEAVES_MAP.put(leavesBlock, type);
+                    return type;
+                }
+            } catch (Throwable ignored) {}
+        }
+
+        for (BerryType type : BerryType.values()) {
+            try {
+                if (type.getLeavesBlock() == leavesBlock) {
+                    BERRY_LEAVES_MAP.put(leavesBlock, type);
+                    return type;
+                }
+            } catch (Throwable ignored) {}
+        }
+
+        return null;
+    }
+
+    private static List<BlockPos> findTreeRipeApricornLeaves(Level level, BlockPos origin) {
         List<BlockPos> ripeLeaves = new ArrayList<>();
         Set<BlockPos> visited = new HashSet<>();
         Queue<BlockPos> queue = new ArrayDeque<>();
@@ -146,7 +276,7 @@ public class ApricornTreeHarvestHandler {
         queue.add(origin);
         visited.add(origin);
 
-        int maxSearchBlocks = 350;
+        int maxSearchBlocks = 500;
 
         while (!queue.isEmpty() && visited.size() < maxSearchBlocks) {
             BlockPos current = queue.poll();
@@ -174,16 +304,73 @@ public class ApricornTreeHarvestHandler {
                         BlockPos neighbor = current.offset(dx, dy, dz);
                         if (visited.contains(neighbor)) continue;
 
-                        if (Math.abs(neighbor.getX() - origin.getX()) > 7 ||
-                            Math.abs(neighbor.getZ() - origin.getZ()) > 7 ||
-                            neighbor.getY() - origin.getY() < -3 ||
-                            neighbor.getY() - origin.getY() > 10) {
+                        if (Math.abs(neighbor.getX() - origin.getX()) > 9 ||
+                            Math.abs(neighbor.getZ() - origin.getZ()) > 9 ||
+                            neighbor.getY() - origin.getY() < -4 ||
+                            neighbor.getY() - origin.getY() > 14) {
                             continue;
                         }
 
                         BlockState nState = level.getBlockState(neighbor);
                         Block nBlock = nState.getBlock();
                         if (isApricornLog(nBlock) || nBlock instanceof ApricornLeavesBlock) {
+                            visited.add(neighbor);
+                            queue.add(neighbor);
+                        }
+                    }
+                }
+            }
+        }
+
+        return ripeLeaves;
+    }
+
+    private static List<BlockPos> findTreeRipeBerryLeaves(Level level, BlockPos origin) {
+        List<BlockPos> ripeLeaves = new ArrayList<>();
+        Set<BlockPos> visited = new HashSet<>();
+        Queue<BlockPos> queue = new ArrayDeque<>();
+
+        queue.add(origin);
+        visited.add(origin);
+
+        int maxSearchBlocks = 600;
+
+        while (!queue.isEmpty() && visited.size() < maxSearchBlocks) {
+            BlockPos current = queue.poll();
+            BlockState currentState = level.getBlockState(current);
+            Block currentBlock = currentState.getBlock();
+
+            boolean isCurrentLog = isBerryLog(currentBlock);
+            boolean isCurrentLeaves = currentBlock instanceof BerryLeavesBlock;
+
+            if (!isCurrentLog && !isCurrentLeaves) {
+                continue;
+            }
+
+            if (isCurrentLeaves && currentState.hasProperty(BerryLeavesBlock.AGE)) {
+                if (currentState.getValue(BerryLeavesBlock.AGE) >= 2) {
+                    ripeLeaves.add(current);
+                }
+            }
+
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dy = -1; dy <= 1; dy++) {
+                    for (int dz = -1; dz <= 1; dz++) {
+                        if (dx == 0 && dy == 0 && dz == 0) continue;
+
+                        BlockPos neighbor = current.offset(dx, dy, dz);
+                        if (visited.contains(neighbor)) continue;
+
+                        if (Math.abs(neighbor.getX() - origin.getX()) > 10 ||
+                            Math.abs(neighbor.getZ() - origin.getZ()) > 10 ||
+                            neighbor.getY() - origin.getY() < -4 ||
+                            neighbor.getY() - origin.getY() > 16) {
+                            continue;
+                        }
+
+                        BlockState nState = level.getBlockState(neighbor);
+                        Block nBlock = nState.getBlock();
+                        if (isBerryLog(nBlock) || nBlock instanceof BerryLeavesBlock) {
                             visited.add(neighbor);
                             queue.add(neighbor);
                         }
