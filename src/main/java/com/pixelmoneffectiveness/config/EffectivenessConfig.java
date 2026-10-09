@@ -19,6 +19,7 @@ public class EffectivenessConfig {
     public final ModConfigSpec.IntValue radarScanRadius;
     public final ModConfigSpec.BooleanValue radarSoundAlert;
     public final ModConfigSpec.BooleanValue radarFilterNormalPoke;
+    public final ModConfigSpec.BooleanValue radarHideOnCooldown;
 
     public final ModConfigSpec.BooleanValue searchMaster;
     public final ModConfigSpec.BooleanValue searchBeast;
@@ -88,6 +89,11 @@ public class EffectivenessConfig {
             .comment("Скрывать обычные (красные) поке-луты, отображая только Ультра, Мастер, Бист и Спец.",
                      "Hide normal (red) poké loot, only showing Ultra, Master, Beast, and Special loot.")
             .define("filterNormalPoke", false);
+
+        radarHideOnCooldown = builder
+            .comment("Скрывать с радара залутанные сундуки, которые находятся на кулдауне (перезарядке).",
+                     "Hide looted chests from radar while they are on cooldown.")
+            .define("hideOnCooldown", true);
 
         searchMaster = builder
             .comment("Искать Мастер-лут (Master Ball).",

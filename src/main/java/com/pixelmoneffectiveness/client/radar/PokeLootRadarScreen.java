@@ -12,7 +12,7 @@ import java.util.Locale;
 public class PokeLootRadarScreen extends Screen {
 
     private static final int DIALOG_WIDTH = 270;
-    private static final int DIALOG_HEIGHT = 230;
+    private static final int DIALOG_HEIGHT = 252;
 
     public PokeLootRadarScreen() {
         super(Component.literal("PokéLoot Radar"));
@@ -162,12 +162,31 @@ public class PokeLootRadarScreen extends Screen {
         .build();
         this.addRenderableWidget(sndToggle);
 
-        // Row 7: Done button
+        // Row 7: Hide on Cooldown toggle
+        boolean hideCd = EffectivenessConfig.CONFIG != null && EffectivenessConfig.CONFIG.radarHideOnCooldown.get();
+        String cdStatus = hideCd ? (isRu ? "§aВКЛ (Скрывать)" : "§aON (Hide)") : (isRu ? "§cВЫКЛ (Показывать)" : "§cOFF (Show)");
+        String cdLabel = (isRu ? "Сундуки на КД: " : "Chests on CD: ") + cdStatus;
+        Button cdToggle = Button.builder(
+            Component.literal(cdLabel),
+            btn -> {
+                if (EffectivenessConfig.CONFIG != null) {
+                    EffectivenessConfig.CONFIG.radarHideOnCooldown.set(!hideCd);
+                    EffectivenessConfig.SPEC.save();
+                }
+                rebuildScreen();
+            }
+        )
+        .bounds(left + 10, top + 192, 250, 20)
+        .tooltip(Tooltip.create(Component.literal(isRu ? "Автоматически скрывать с радара залутанные сундуки на перезарядке" : "Automatically hide looted chests on cooldown from radar")))
+        .build();
+        this.addRenderableWidget(cdToggle);
+
+        // Row 8: Done button
         Button doneBtn = Button.builder(
             Component.literal(isRu ? "✔ Готово" : "✔ Done"),
             btn -> this.onClose()
         )
-        .bounds(left + 35, top + 198, 200, 22)
+        .bounds(left + 35, top + 218, 200, 22)
         .build();
         this.addRenderableWidget(doneBtn);
     }

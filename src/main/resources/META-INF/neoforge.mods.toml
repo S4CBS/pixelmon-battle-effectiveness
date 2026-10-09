@@ -4,7 +4,7 @@ license="MIT"
 
 [[mods]]
 modId="pixelmoneffectiveness"
-version="1.0.4"
+version="1.0.5"
 displayName="Pixelmon Battle Effectiveness"
 authors="s4cbs"
 description='''Shows attack effectiveness and damage multiplier hints for all moves in battle, allows bulk apricorn harvesting by sneak-clicking trunks, and provides an optimized PokéLoot Radar with HUD & 3D ESP for all PokéChest tiers.'''

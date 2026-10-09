@@ -6,6 +6,9 @@
   "client": [
     "ChooseAttackMoveButtonMixin"
   ],
+  "mixins": [
+    "PokeChestTileEntityMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   }

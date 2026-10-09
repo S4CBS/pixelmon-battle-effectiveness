@@ -10,11 +10,9 @@ def build():
     for root, dirs, files in os.walk(libs_dir):
         for f in files:
             if f.endswith('.jar'):
+                if '-slim.jar' in f:
+                    continue
                 jars.append(os.path.join(root, f))
-
-    mc_jar = os.path.join(appdata, 'versions', '1.21.1', '1.21.1.jar')
-    if os.path.exists(mc_jar):
-        jars.append(mc_jar)
 
     pixelmon_jar = os.path.join(appdata, 'mods', 'Pixelmon-1.21.1-9.4.1-universal.jar')
     if os.path.exists(pixelmon_jar):
@@ -49,7 +47,7 @@ def build():
     shutil.copytree('build/classes', build_jar, dirs_exist_ok=True)
 
     os.makedirs('build/libs', exist_ok=True)
-    jar_file = 'build/libs/PixelmonEffectiveness-1.21.1-1.0.4.jar'
+    jar_file = 'build/libs/PixelmonEffectiveness-1.21.1-1.0.5.jar'
     if os.path.exists(jar_file):
         os.remove(jar_file)
 
@@ -63,11 +61,11 @@ def build():
     print(f'Created JAR: {jar_file} ({os.path.getsize(jar_file)} bytes)')
 
     mods_dir = os.path.join(appdata, 'mods')
-    dest_jar = os.path.join(mods_dir, 'PixelmonEffectiveness-1.21.1-1.0.4.jar')
+    dest_jar = os.path.join(mods_dir, 'PixelmonEffectiveness-1.21.1-1.0.5.jar')
     shutil.copy2(jar_file, dest_jar)
     print(f'Deployed to mods: {dest_jar}')
 
-    for old in ['PixelmonEffectiveness-1.21.1-1.0.0.jar', 'PixelmonEffectiveness-1.21.1-1.0.1.jar', 'PixelmonEffectiveness-1.21.1-1.0.2.jar', 'PixelmonEffectiveness-1.21.1-1.0.3.jar']:
+    for old in ['PixelmonEffectiveness-1.21.1-1.0.0.jar', 'PixelmonEffectiveness-1.21.1-1.0.1.jar', 'PixelmonEffectiveness-1.21.1-1.0.2.jar', 'PixelmonEffectiveness-1.21.1-1.0.3.jar', 'PixelmonEffectiveness-1.21.1-1.0.4.jar']:
         p = os.path.join(mods_dir, old)
         if os.path.exists(p):
             os.remove(p)

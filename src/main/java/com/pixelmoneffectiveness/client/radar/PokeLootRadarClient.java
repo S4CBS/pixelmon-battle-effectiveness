@@ -2,6 +2,8 @@ package com.pixelmoneffectiveness.client.radar;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
+import com.pixelmonmod.pixelmon.Pixelmon;
+import com.pixelmonmod.pixelmon.api.events.PokeLootEvent;
 import com.pixelmonmod.pixelmon.blocks.enums.EnumPokeChestType;
 import com.pixelmonmod.pixelmon.blocks.enums.EnumPokechestVisibility;
 import com.pixelmonmod.pixelmon.blocks.tileentity.PokeChestTileEntity;
@@ -15,10 +17,12 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.IEventBus;
@@ -27,8 +31,10 @@ import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.client.event.RenderGuiEvent;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class PokeLootRadarClient {
 
@@ -48,6 +54,7 @@ public class PokeLootRadarClient {
     private static int scanCooldown = 0;
     private static List<PokeLootEntry> cachedEntries = new ArrayList<>();
     private static final Set<BlockPos> knownHighTierPositions = new HashSet<>();
+    private static final Map<BlockPos, Long> localCooldownMap = new ConcurrentHashMap<>();
 
     public static boolean isRadarActive() {
         return radarActive;
@@ -62,6 +69,8 @@ public class PokeLootRadarClient {
         NeoForge.EVENT_BUS.addListener(PokeLootRadarClient::onClientTick);
         NeoForge.EVENT_BUS.addListener(PokeLootRadarClient::onRenderGui);
         NeoForge.EVENT_BUS.addListener(PokeLootRadarClient::onRenderLevelStage);
+        NeoForge.EVENT_BUS.addListener(PokeLootRadarClient::onRightClickBlock);
+        Pixelmon.EVENT_BUS.addListener(PokeLootRadarClient::onPokeLootClaim);
     }
 
     public static void onRegisterKeyMappings(RegisterKeyMappingsEvent event) {
@@ -106,6 +115,80 @@ public class PokeLootRadarClient {
         }
     }
 
+    public static void onPokeLootClaim(PokeLootEvent.Claim event) {
+        if (event.chest == null) return;
+        BlockPos pos = event.chest.getBlockPos();
+        long lootTimeHours = 24;
+        try {
+            if (com.pixelmonmod.pixelmon.api.config.PixelmonConfigProxy.getSpawningPokeLoot() != null) {
+                lootTimeHours = com.pixelmonmod.pixelmon.api.config.PixelmonConfigProxy.getSpawningPokeLoot().getLootTime();
+            }
+        } catch (Throwable ignored) {}
+        long expire = System.currentTimeMillis() + lootTimeHours * 3600 * 1000L;
+        localCooldownMap.put(pos, expire);
+        cachedEntries.removeIf(e -> e.pos.equals(pos));
+    }
+
+    public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
+        if (event.getLevel().isClientSide()) {
+            BlockPos pos = event.getPos();
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.player != null && event.getLevel().getBlockEntity(pos) instanceof PokeChestTileEntity chest) {
+                if (isChestOnCooldown(mc, pos, chest)) {
+                    localCooldownMap.put(pos, System.currentTimeMillis() + 60000L);
+                    cachedEntries.removeIf(e -> e.pos.equals(pos));
+                }
+            }
+        }
+    }
+
+    public static boolean isChestOnCooldown(Minecraft mc, BlockPos pos, PokeChestTileEntity clientChest) {
+        if (EffectivenessConfig.CONFIG != null && !EffectivenessConfig.CONFIG.radarHideOnCooldown.get()) {
+            return false;
+        }
+        if (mc.player == null) return false;
+        UUID playerUUID = mc.player.getUUID();
+
+        // 1. Check local session cooldown memory
+        Long expire = localCooldownMap.get(pos);
+        if (expire != null) {
+            if (System.currentTimeMillis() < expire) {
+                return true;
+            } else {
+                localCooldownMap.remove(pos);
+            }
+        }
+
+        // 2. Check client tile entity (synced via Mixin)
+        if (clientChest != null) {
+            try {
+                if (!clientChest.canClaim(playerUUID)) {
+                    return true;
+                }
+            } catch (Throwable ignored) {}
+        }
+
+        // 3. In Singleplayer, check server tile entity directly
+        try {
+            if (mc.getSingleplayerServer() != null && mc.level != null) {
+                ServerLevel sLevel = mc.getSingleplayerServer().getLevel(mc.level.dimension());
+                if (sLevel != null) {
+                    ChunkAccess sChunk = sLevel.getChunkSource().getChunkNow(pos.getX() >> 4, pos.getZ() >> 4);
+                    if (sChunk != null) {
+                        BlockEntity sBe = sChunk.getBlockEntity(pos);
+                        if (sBe instanceof PokeChestTileEntity sChest) {
+                            if (!sChest.canClaim(playerUUID)) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+
+        return false;
+    }
+
     private static void scanWorld(Minecraft mc) {
         ClientLevel level = mc.level;
         Player player = mc.player;
@@ -132,6 +215,10 @@ public class PokeLootRadarClient {
                 for (BlockEntity be : blockEntities.values()) {
                     if (be instanceof PokeChestTileEntity chest) {
                         BlockPos pos = chest.getBlockPos();
+                        if (isChestOnCooldown(mc, pos, chest)) {
+                            continue;
+                        }
+
                         EnumPokeChestType type = chest.getChestType();
                         PokeLootTier tier = PokeLootTier.fromChestType(type);
 
@@ -172,6 +259,8 @@ public class PokeLootRadarClient {
     private static void updateDistancesAndAngles(Minecraft mc) {
         Player player = mc.player;
         if (player == null) return;
+
+        cachedEntries.removeIf(entry -> isChestOnCooldown(mc, entry.pos, null));
 
         for (PokeLootEntry entry : cachedEntries) {
             double dx = entry.pos.getX() + 0.5 - player.getX();
