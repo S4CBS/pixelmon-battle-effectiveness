@@ -1,6 +1,7 @@
 package com.pixelmoneffectiveness;
 
 import com.pixelmoneffectiveness.config.EffectivenessConfig;
+import com.pixelmoneffectiveness.client.overlay.PokemonOverlayClient;
 import com.pixelmoneffectiveness.client.radar.PokeLootRadarClient;
 import com.pixelmoneffectiveness.handler.ApricornTreeHarvestHandler;
 import net.neoforged.api.distmarker.Dist;
@@ -25,6 +26,7 @@ public class PixelmonEffectivenessMod {
 
         if (FMLEnvironment.dist == Dist.CLIENT) {
             PokeLootRadarClient.init(modEventBus);
+            PokemonOverlayClient.init(modEventBus);
         }
     }
 }

@@ -181,12 +181,25 @@ public class PokeLootRadarScreen extends Screen {
         .build();
         this.addRenderableWidget(cdToggle);
 
-        // Row 8: Done button
+        // Row 8: Overlay Settings & Done buttons
+        Button overlayBtn = Button.builder(
+            Component.literal(isRu ? "⚙ Инфо-панель" : "⚙ Overlay"),
+            btn -> {
+                if (this.minecraft != null) {
+                    this.minecraft.setScreen(new com.pixelmoneffectiveness.client.overlay.PokemonOverlaySettingsScreen());
+                }
+            }
+        )
+        .bounds(left + 10, top + 218, 122, 22)
+        .tooltip(Tooltip.create(Component.literal(isRu ? "Настройки инфо-панели покемона при наведении (Cobblemon HUD)" : "Configure Pokémon info overlay tooltip (Cobblemon HUD)")))
+        .build();
+        this.addRenderableWidget(overlayBtn);
+
         Button doneBtn = Button.builder(
             Component.literal(isRu ? "✔ Готово" : "✔ Done"),
             btn -> this.onClose()
         )
-        .bounds(left + 35, top + 218, 200, 22)
+        .bounds(left + 138, top + 218, 122, 22)
         .build();
         this.addRenderableWidget(doneBtn);
     }

@@ -8,5 +8,6 @@
   "pixelmoneffectiveness.apricorn.harvested": "§aHarvested %s apricorns",
   "key.pixelmoneffectiveness.toggle_radar": "Toggle PokéLoot Radar",
   "key.pixelmoneffectiveness.open_radar_gui": "PokéLoot Radar Settings",
+  "key.pixelmoneffectiveness.open_overlay_settings": "Pokémon Info Overlay Settings",
   "key.categories.pixelmoneffectiveness": "Pixelmon Utilities"
 }

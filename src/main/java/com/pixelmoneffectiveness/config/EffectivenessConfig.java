@@ -28,6 +28,17 @@ public class EffectivenessConfig {
     public final ModConfigSpec.BooleanValue searchPoke;
     public final ModConfigSpec.BooleanValue searchHidden;
 
+    public final ModConfigSpec.BooleanValue overlayEnabled;
+    public final ModConfigSpec.ConfigValue<String> overlayAnchor;
+    public final ModConfigSpec.IntValue overlayOffsetX;
+    public final ModConfigSpec.IntValue overlayOffsetY;
+    public final ModConfigSpec.DoubleValue overlayScale;
+    public final ModConfigSpec.IntValue overlayBackgroundAlpha;
+    public final ModConfigSpec.IntValue overlayBackgroundColor;
+    public final ModConfigSpec.IntValue overlayBorderColor;
+    public final ModConfigSpec.IntValue overlayTextColor;
+    public final ModConfigSpec.DoubleValue overlayReachDistance;
+
     public EffectivenessConfig(ModConfigSpec.Builder builder) {
         builder.push("general");
 
@@ -124,6 +135,57 @@ public class EffectivenessConfig {
             .comment("Искать скрытый лут (невидимые сундуки-покеболы).",
                      "Search for hidden Poké chests (invisible pokeballs).")
             .define("searchHidden", true);
+
+        builder.pop();
+
+        builder.push("overlay");
+
+        overlayEnabled = builder
+            .comment("Включить инфо-окно о покемоне при наведении прицела (в стиле Cobblemon).",
+                     "Enable Pokémon info overlay on crosshair hover (Cobblemon style).")
+            .define("enabled", true);
+
+        overlayAnchor = builder
+            .comment("Расположение окна: TOP_CENTER, TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT, CUSTOM.",
+                     "Window anchor position.")
+            .define("anchor", "TOP_CENTER");
+
+        overlayOffsetX = builder
+            .comment("Смещение окна по оси X в пикселях.", "Window X offset in pixels.")
+            .defineInRange("offsetX", 0, -1000, 1000);
+
+        overlayOffsetY = builder
+            .comment("Смещение окна по оси Y в пикселях.", "Window Y offset in pixels.")
+            .defineInRange("offsetY", 10, -500, 1000);
+
+        overlayScale = builder
+            .comment("Размер (масштаб) окна от 0.5x до 2.0x.", "Window scale (0.5x to 2.0x).")
+            .defineInRange("scale", 1.0, 0.5, 2.0);
+
+        overlayBackgroundAlpha = builder
+            .comment("Прозрачность фона окна (0 = полностью прозрачно, 255 = непрозрачно).",
+                     "Background alpha (0 to 255).")
+            .defineInRange("backgroundAlpha", 200, 0, 255);
+
+        overlayBackgroundColor = builder
+            .comment("Цвет фона окна в HEX (RGB, по умолчанию 0x141726 - темный сланцевый как в Cobblemon).",
+                     "Window background RGB color in hex.")
+            .defineInRange("backgroundColor", 0x141726, 0x000000, 0xFFFFFF);
+
+        overlayBorderColor = builder
+            .comment("Цвет рамки окна в HEX (RGB, по умолчанию 0x303650).",
+                     "Window border RGB color in hex.")
+            .defineInRange("borderColor", 0x303650, 0x000000, 0xFFFFFF);
+
+        overlayTextColor = builder
+            .comment("Основной цвет текста в HEX (RGB, по умолчанию 0xFFFFFF).",
+                     "Window text RGB color in hex.")
+            .defineInRange("textColor", 0xFFFFFF, 0x000000, 0xFFFFFF);
+
+        overlayReachDistance = builder
+            .comment("Максимальная дистанция обнаружения покемона в блоках (от 4 до 48).",
+                     "Max Pokémon detection reach distance in blocks (4 to 48).")
+            .defineInRange("reachDistance", 24.0, 4.0, 48.0);
 
         builder.pop();
     }

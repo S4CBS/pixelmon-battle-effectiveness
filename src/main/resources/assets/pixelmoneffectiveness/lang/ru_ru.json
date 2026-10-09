@@ -8,5 +8,6 @@
   "pixelmoneffectiveness.apricorn.harvested": "§aСобрано априкорнов: %s",
   "key.pixelmoneffectiveness.toggle_radar": "Вкл/Выкл радар PokéLoot",
   "key.pixelmoneffectiveness.open_radar_gui": "Настройки радара PokéLoot",
+  "key.pixelmoneffectiveness.open_overlay_settings": "Настройки инфо-панели покемона",
   "key.categories.pixelmoneffectiveness": "Pixelmon Utilities"
 }
