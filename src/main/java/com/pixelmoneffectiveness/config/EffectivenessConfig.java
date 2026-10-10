@@ -29,6 +29,7 @@ public class EffectivenessConfig {
     public final ModConfigSpec.BooleanValue searchHidden;
 
     public final ModConfigSpec.BooleanValue overlayEnabled;
+    public final ModConfigSpec.BooleanValue overlayAlwaysExpanded;
     public final ModConfigSpec.ConfigValue<String> overlayAnchor;
     public final ModConfigSpec.IntValue overlayOffsetX;
     public final ModConfigSpec.IntValue overlayOffsetY;
@@ -144,6 +145,11 @@ public class EffectivenessConfig {
             .comment("Включить инфо-окно о покемоне при наведении прицела (в стиле Cobblemon).",
                      "Enable Pokémon info overlay on crosshair hover (Cobblemon style).")
             .define("enabled", true);
+
+        overlayAlwaysExpanded = builder
+            .comment("Всегда показывать подробную информацию (IVs, характер, способность и др.) сразу, без необходимости приседать/зажимать Shift.",
+                     "Always show extended Pokémon details (IVs, nature, ability, etc.) immediately without having to sneak or hold Shift.")
+            .define("alwaysExpanded", false);
 
         overlayAnchor = builder
             .comment("Расположение окна: TOP_CENTER, TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT, CUSTOM.",

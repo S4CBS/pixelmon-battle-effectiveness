@@ -85,7 +85,8 @@ public class PokemonOverlayClient {
             return;
         }
 
-        boolean isSneaking = mc.player.isCrouching() || Screen.hasShiftDown();
+        boolean alwaysExpanded = (EffectivenessConfig.CONFIG != null) && EffectivenessConfig.CONFIG.overlayAlwaysExpanded.get();
+        boolean isSneaking = alwaysExpanded || mc.player.isCrouching() || Screen.hasShiftDown();
         boolean isRu = isRussian(mc);
 
         Pokemon pokemon = resolvePokemon(mc, target);

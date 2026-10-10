@@ -19,7 +19,7 @@ import java.util.Locale;
 public class PokemonOverlaySettingsScreen extends Screen {
 
     private static final int DIALOG_WIDTH = 450;
-    private static final int DIALOG_HEIGHT = 270;
+    private static final int DIALOG_HEIGHT = 295;
 
     // Color presets for background
     private static final int[] BG_COLOR_PRESETS = {
@@ -66,6 +66,7 @@ public class PokemonOverlaySettingsScreen extends Screen {
 
     // Screen temporary state
     private boolean enabled;
+    private boolean alwaysExpanded;
     private String anchor;
     private int offsetX;
     private int offsetY;
@@ -90,6 +91,7 @@ public class PokemonOverlaySettingsScreen extends Screen {
 
         if (EffectivenessConfig.CONFIG != null) {
             enabled = EffectivenessConfig.CONFIG.overlayEnabled.get();
+            alwaysExpanded = EffectivenessConfig.CONFIG.overlayAlwaysExpanded.get();
             anchor = EffectivenessConfig.CONFIG.overlayAnchor.get();
             offsetX = EffectivenessConfig.CONFIG.overlayOffsetX.get();
             offsetY = EffectivenessConfig.CONFIG.overlayOffsetY.get();
@@ -99,6 +101,7 @@ public class PokemonOverlaySettingsScreen extends Screen {
             textColor = EffectivenessConfig.CONFIG.overlayTextColor.get();
         } else {
             enabled = true;
+            alwaysExpanded = false;
             anchor = "TOP_CENTER";
             offsetX = 0;
             offsetY = 10;
@@ -107,6 +110,8 @@ public class PokemonOverlaySettingsScreen extends Screen {
             bgColor = 0x141726;
             textColor = 0xFFFFFF;
         }
+
+        previewSneak = alwaysExpanded;
 
         rebuildControls();
     }
@@ -139,7 +144,27 @@ public class PokemonOverlaySettingsScreen extends Screen {
         this.addRenderableWidget(toggleBtn);
         curY += rowH;
 
-        // 2. Anchor Position Button
+        // 2. Always Expanded Details toggle
+        String expandStatus = alwaysExpanded ? (isRu ? "§aСразу" : "§aAlways") : (isRu ? "§eПо приседу" : "§eOn Sneak");
+        Button expandBtn = Button.builder(
+            Component.literal((isRu ? "Доп. инфо: " : "Details: ") + expandStatus),
+            btn -> {
+                alwaysExpanded = !alwaysExpanded;
+                previewSneak = alwaysExpanded;
+                saveConfig();
+                rebuildControls();
+            }
+        )
+        .bounds(col1X, curY, colW, 20)
+        .tooltip(Tooltip.create(Component.literal(
+            isRu ? "Показывать подробную информацию (IVs, характер, способность) сразу или только при приседе (Shift)"
+                 : "Show detailed Pokémon information (IVs, nature, ability) immediately or only while sneaking (Shift)"
+        )))
+        .build();
+        this.addRenderableWidget(expandBtn);
+        curY += rowH;
+
+        // 3. Anchor Position Button
         String anchorDisplayName = getAnchorDisplayName(anchor, isRu);
         Button anchorBtn = Button.builder(
             Component.literal((isRu ? "Якорь: " : "Anchor: ") + "§e" + anchorDisplayName),
@@ -266,6 +291,8 @@ public class PokemonOverlaySettingsScreen extends Screen {
             Component.literal(isRu ? "↺ Сброс" : "↺ Reset"),
             btn -> {
                 enabled = true;
+                alwaysExpanded = false;
+                previewSneak = false;
                 anchor = "TOP_CENTER";
                 offsetX = 0;
                 offsetY = 10;
@@ -312,6 +339,7 @@ public class PokemonOverlaySettingsScreen extends Screen {
     private void saveConfig() {
         if (EffectivenessConfig.CONFIG != null) {
             EffectivenessConfig.CONFIG.overlayEnabled.set(enabled);
+            EffectivenessConfig.CONFIG.overlayAlwaysExpanded.set(alwaysExpanded);
             EffectivenessConfig.CONFIG.overlayAnchor.set(anchor);
             EffectivenessConfig.CONFIG.overlayOffsetX.set(offsetX);
             EffectivenessConfig.CONFIG.overlayOffsetY.set(offsetY);
