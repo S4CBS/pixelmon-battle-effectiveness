@@ -7,7 +7,8 @@
     "ChooseAttackMoveButtonMixin"
   ],
   "mixins": [
-    "PokeChestTileEntityMixin"
+    "PokeChestTileEntityMixin",
+    "ScreenMixin"
   ],
   "injectors": {
     "defaultRequire": 1
