@@ -4,12 +4,14 @@ import com.pixelmonmod.pixelmon.blocks.enums.EnumPokeChestType;
 import com.pixelmoneffectiveness.config.EffectivenessConfig;
 import net.minecraft.network.chat.Component;
 
+import net.minecraft.resources.ResourceLocation;
+
 public enum PokeLootTier {
-    MASTER("Мастер-лут", "Master Loot", 0xFFD700FF, 0xFFAA00AA, "§d[★]", 1),
-    BEAST("Бист-лут", "Beast Loot", 0xFF00E5FF, 0xFF00AAAA, "§b[✦]", 2),
-    ULTRA("Ультра-лут", "Ultra Loot", 0xFFFFD700, 0xFFFFAA00, "§e[◆]", 3),
-    SPECIAL("Спец-лут", "Special Loot", 0xFF69F0AE, 0xFF00AA00, "§a[✤]", 4),
-    POKE("Поке-лут", "Poké Loot", 0xFFFF5252, 0xFFAA0000, "§c[•]", 5);
+    MASTER("Мастер-лут", "Master Loot", 0xFFD700FF, 0xFFAA00AA, "§d[★]", 1, ResourceLocation.fromNamespaceAndPath("pixelmon", "textures/item/pokeballs/master_ball.png")),
+    BEAST("Бист-лут", "Beast Loot", 0xFF00E5FF, 0xFF00AAAA, "§b[✦]", 2, ResourceLocation.fromNamespaceAndPath("pixelmon", "textures/item/pokeballs/beast_ball.png")),
+    ULTRA("Ультра-лут", "Ultra Loot", 0xFFFFD700, 0xFFFFAA00, "§e[◆]", 3, ResourceLocation.fromNamespaceAndPath("pixelmon", "textures/item/pokeballs/ultra_ball.png")),
+    SPECIAL("Спец-лут", "Special Loot", 0xFF69F0AE, 0xFF00AA00, "§a[✤]", 4, ResourceLocation.fromNamespaceAndPath("pixelmon", "textures/item/pokeballs/gs_ball.png")),
+    POKE("Поке-лут", "Poké Loot", 0xFFFF5252, 0xFFAA0000, "§c[•]", 5, ResourceLocation.fromNamespaceAndPath("pixelmon", "textures/item/pokeballs/poke_ball.png"));
 
     private final String displayNameRu;
     private final String displayNameEn;
@@ -17,14 +19,16 @@ public enum PokeLootTier {
     private final int hudColor;
     private final String iconPrefix;
     private final int priority;
+    private final ResourceLocation ballTexture;
 
-    PokeLootTier(String displayNameRu, String displayNameEn, int colorRgb, int hudColor, String iconPrefix, int priority) {
+    PokeLootTier(String displayNameRu, String displayNameEn, int colorRgb, int hudColor, String iconPrefix, int priority, ResourceLocation ballTexture) {
         this.displayNameRu = displayNameRu;
         this.displayNameEn = displayNameEn;
         this.colorRgb = colorRgb;
         this.hudColor = hudColor;
         this.iconPrefix = iconPrefix;
         this.priority = priority;
+        this.ballTexture = ballTexture;
     }
 
     public String getDisplayName(boolean isRu) {
@@ -45,6 +49,10 @@ public enum PokeLootTier {
 
     public int getPriority() {
         return priority;
+    }
+
+    public ResourceLocation getBallTexture() {
+        return ballTexture;
     }
 
     public boolean isSearchEnabled() {

@@ -9,6 +9,7 @@ import com.pixelmonmod.pixelmon.blocks.enums.EnumPokeChestType;
 import com.pixelmonmod.pixelmon.blocks.enums.EnumPokechestVisibility;
 import com.pixelmonmod.pixelmon.blocks.tileentity.PokeChestTileEntity;
 import com.pixelmoneffectiveness.config.EffectivenessConfig;
+import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Camera;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
@@ -16,8 +17,11 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.RenderType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import org.joml.Matrix4f;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -430,6 +434,26 @@ public class PokeLootRadarClient {
                 continue;
             }
 
+            float alpha = entry.isHidden ? 0.75f : 1.0f;
+
+            // 1. In-world see-through Pokéball icon right at the chest position (y + 0.35)
+            double cx = entry.pos.getX() + 0.5 - camPos.x;
+            double cy = entry.pos.getY() + 0.35 - camPos.y;
+            double cz = entry.pos.getZ() + 0.5 - camPos.z;
+
+            poseStack.pushPose();
+            poseStack.translate(cx, cy, cz);
+            poseStack.mulPose(Axis.YP.rotationDegrees(-camera.getYRot()));
+            poseStack.mulPose(Axis.XP.rotationDegrees(camera.getXRot()));
+
+            // Size: 0.5 blocks when close, scales slightly with distance so it stays clearly visible
+            float ballScale = (float) Math.max(0.5f, Math.min(1.4f, entry.distance * 0.04f));
+            poseStack.scale(ballScale, -ballScale, ballScale);
+
+            drawIcon(bufferSource, poseStack.last().pose(), entry.tier.getBallTexture(), -0.5f, -0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, alpha);
+            poseStack.popPose();
+
+            // 2. Billboard text and icon floating above the chest (y + 1.2)
             double lx = entry.pos.getX() + 0.5 - camPos.x;
             double ly = entry.pos.getY() + 1.2 - camPos.y;
             double lz = entry.pos.getZ() + 0.5 - camPos.z;
@@ -448,6 +472,9 @@ public class PokeLootRadarClient {
             String label = entry.tier.getIconPrefix() + " " + name + " " + (int) Math.round(entry.distance) + "m" + hiddenTag;
             float textWidth = font.width(label);
 
+            // Icon above label (14x14 pixels)
+            drawIcon(bufferSource, poseStack.last().pose(), entry.tier.getBallTexture(), -7f, -17f, 7f, -3f, 1.0f, 0.0f, 0.0f, 1.0f, alpha);
+
             font.drawInBatch(
                 label,
                 -textWidth / 2f,
@@ -465,5 +492,14 @@ public class PokeLootRadarClient {
         }
 
         bufferSource.endBatch();
+    }
+
+    private static void drawIcon(MultiBufferSource bufferSource, Matrix4f matrix, ResourceLocation texture, float x0, float y0, float x1, float y1, float u0, float v0, float u1, float v1, float alpha) {
+        VertexConsumer consumer = bufferSource.getBuffer(RenderType.textSeeThrough(texture));
+        int a = Math.max(0, Math.min(255, (int)(alpha * 255.0f)));
+        consumer.addVertex(matrix, x0, y0, 0.0f).setColor(255, 255, 255, a).setUv(u0, v0).setLight(15728880);
+        consumer.addVertex(matrix, x0, y1, 0.0f).setColor(255, 255, 255, a).setUv(u0, v1).setLight(15728880);
+        consumer.addVertex(matrix, x1, y1, 0.0f).setColor(255, 255, 255, a).setUv(u1, v1).setLight(15728880);
+        consumer.addVertex(matrix, x1, y0, 0.0f).setColor(255, 255, 255, a).setUv(u1, v0).setLight(15728880);
     }
 }
