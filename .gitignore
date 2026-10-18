@@ -12,3 +12,5 @@ out/
 .project
 bin/
 run/
+__pycache__/
+*.pyc
