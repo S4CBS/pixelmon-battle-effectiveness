@@ -16,9 +16,23 @@ def build():
 
     mods_dir = os.path.join(appdata, 'mods')
     if os.path.exists(mods_dir):
+        import zipfile
+        extracted_dir = 'build/extracted_libs'
+        os.makedirs(extracted_dir, exist_ok=True)
         for f in os.listdir(mods_dir):
             if f.endswith('.jar') and not f.startswith('PixelmonEffectiveness'):
-                jars.append(os.path.join(mods_dir, f))
+                jar_path = os.path.join(mods_dir, f)
+                jars.append(jar_path)
+                try:
+                    with zipfile.ZipFile(jar_path, 'r') as z:
+                        for n in z.namelist():
+                            if 'jarjar' in n and n.endswith('.jar'):
+                                out_p = os.path.join(extracted_dir, os.path.basename(n))
+                                with open(out_p, 'wb') as ef:
+                                    ef.write(z.read(n))
+                                jars.append(out_p)
+                except Exception:
+                    pass
 
     cp = os.pathsep.join(jars)
 
