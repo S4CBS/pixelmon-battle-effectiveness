@@ -400,14 +400,19 @@ public class PokemonPokedexScreen extends Screen {
     }
 
     @Override
+    protected void renderBlurredBackground(float partialTick) {
+        // Disabled to prevent unwanted background blur
+    }
+
+    @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        this.renderBackground(guiGraphics, mouseX, mouseY, partialTick);
+        guiGraphics.fillGradient(0, 0, this.width, this.height, 0x88000000, 0x88000000);
 
         int left = (this.width - DIALOG_WIDTH) / 2;
         int top = (this.height - DIALOG_HEIGHT) / 2;
 
         // Modal Background
-        guiGraphics.fill(left, top, left + DIALOG_WIDTH, top + DIALOG_HEIGHT, 0xEE11151F);
+        guiGraphics.fill(left, top, left + DIALOG_WIDTH, top + DIALOG_HEIGHT, 0xF511151F);
         // Top accent bar
         guiGraphics.fill(left, top, left + DIALOG_WIDTH, top + 2, 0xFF3B82F6);
         // Outer borders
@@ -418,11 +423,11 @@ public class PokemonPokedexScreen extends Screen {
         // Header Title & Counter
         boolean isRu = isRussianLanguage();
         String title = isRu ? "⚡ Покедекс: Выбор для радара" : "⚡ Pokédex: Radar Picker";
-        guiGraphics.drawString(this.font, title, left + 10, top + 9, 0xFFFFFF55, false);
+        guiGraphics.drawString(this.font, title, left + 10, top + 9, 0xFFFFFF55, true);
 
         String selCountStr = (isRu ? "Выбрано: §e" : "Tracking: §e") + selectedEnglishNames.size();
         int countWidth = this.font.width(selCountStr);
-        guiGraphics.drawString(this.font, "§a" + selCountStr, left + DIALOG_WIDTH - 12 - countWidth, top + 9, 0xFF22C55E, false);
+        guiGraphics.drawString(this.font, "§a" + selCountStr, left + DIALOG_WIDTH - 12 - countWidth, top + 9, 0xFF22C55E, true);
 
         // Grid Area Borders & Background
         int listTop = top + 63;
@@ -430,7 +435,7 @@ public class PokemonPokedexScreen extends Screen {
         int listHeight = listBottom - listTop;
         int listWidth = DIALOG_WIDTH - 24;
 
-        guiGraphics.fill(left + 8, listTop - 1, left + 8 + listWidth, listBottom + 1, 0x660B0E14);
+        guiGraphics.fill(left + 8, listTop - 1, left + 8 + listWidth, listBottom + 1, 0xFF0D1117);
         guiGraphics.fill(left + 8, listTop - 1, left + 8 + listWidth, listTop, 0x33FFFFFF);
         guiGraphics.fill(left + 8, listBottom, left + 8 + listWidth, listBottom + 1, 0x33FFFFFF);
 
@@ -456,45 +461,49 @@ public class PokemonPokedexScreen extends Screen {
             boolean isHovered = mouseX >= cardX && mouseX <= cardX + colWidth && mouseY >= cardY && mouseY <= cardY + cardHeight && mouseY >= listTop && mouseY <= listBottom;
             boolean isSelected = selectedEnglishNames.contains(entry.englishName);
 
-            // Card background & border
-            int bgColor = isSelected ? 0x4422C55E : (isHovered ? 0x33475569 : 0x221E293B);
+            // Solid crisp card background & border
+            int bgColor = isSelected ? 0xFF143823 : (isHovered ? 0xFF232D42 : 0xFF181F2E);
             int borderColor = isSelected ? 0xFF22C55E : (isHovered ? 0xFF60A5FA : 0xFF334155);
 
             guiGraphics.fill(cardX, cardY, cardX + colWidth, cardY + cardHeight, bgColor);
             // 1px Border
             guiGraphics.fill(cardX, cardY, cardX + colWidth, cardY + 1, borderColor);
             guiGraphics.fill(cardX, cardY + cardHeight - 1, cardX + colWidth, cardY + cardHeight, borderColor);
-            guiGraphics.fill(cardX, cardY, cardX + 1, cardY + cardHeight, borderColor);
-            guiGraphics.fill(cardX + colWidth - 1, cardY, cardX + colWidth, cardY + cardHeight, borderColor);
+            guiGraphics.fill(cardX, cardY + 1, cardX + 1, cardY + cardHeight - 1, borderColor);
+            guiGraphics.fill(cardX + colWidth - 1, cardY + 1, cardX + colWidth, cardY + cardHeight - 1, borderColor);
 
-            // Sprite Icon
+            // Sprite Icon via Pixelmon ScreenHelper
             if (entry.sprite != null) {
-                guiGraphics.blit(entry.sprite, cardX + 2, cardY + 2, 0.0f, 0.0f, 22, 22, 22, 22);
+                try {
+                    com.pixelmonmod.pixelmon.client.gui.ScreenHelper.drawImage(guiGraphics, entry.sprite, cardX + 2, cardY + 2, 22, 22, 1.0F);
+                } catch (Throwable t) {
+                    guiGraphics.blit(entry.sprite, cardX + 2, cardY + 2, 0.0f, 0.0f, 22, 22, 22, 22);
+                }
             }
 
-            // Dex number
-            guiGraphics.drawString(this.font, entry.formattedDex, cardX + 26, cardY + 4, 0xFFAAAAAA, false);
+            // Dex number (bright crisp gold)
+            guiGraphics.drawString(this.font, entry.formattedDex, cardX + 26, cardY + 4, 0xFFFCD34D, true);
 
-            // Pokémon Name
+            // Pokémon Name (crisp white)
             String nameText = entry.displayName;
             if (this.font.width(nameText) > 85) {
                 nameText = this.font.plainSubstrByWidth(nameText, 80) + "…";
             }
-            int nameColor = isSelected ? 0xFFFFFFFF : 0xFFE2E8F0;
-            guiGraphics.drawString(this.font, nameText, cardX + 54, cardY + 4, nameColor, false);
+            int nameColor = isSelected ? 0xFF86EFAC : 0xFFFFFFFF;
+            guiGraphics.drawString(this.font, nameText, cardX + 54, cardY + 4, nameColor, true);
 
-            // Russian secondary translation if different
+            // Secondary translation if different (crisp soft slate)
             if (!entry.displayName.equalsIgnoreCase(entry.englishName)) {
                 String subText = entry.englishName;
                 if (this.font.width(subText) > 90) {
                     subText = this.font.plainSubstrByWidth(subText, 85) + "…";
                 }
-                guiGraphics.drawString(this.font, subText, cardX + 26, cardY + 14, 0xFF64748B, false);
+                guiGraphics.drawString(this.font, subText, cardX + 26, cardY + 15, 0xFF94A3B8, true);
             }
 
             // Selection Checkmark / Plus Indicator
-            String statusBadge = isSelected ? "§a✔" : "§8+";
-            guiGraphics.drawString(this.font, statusBadge, cardX + colWidth - 13, cardY + 9, 0xFFFFFFFF, false);
+            String statusBadge = isSelected ? "§a✔" : "§7+";
+            guiGraphics.drawString(this.font, statusBadge, cardX + colWidth - 13, cardY + 9, 0xFFFFFFFF, true);
         }
 
         guiGraphics.disableScissor();

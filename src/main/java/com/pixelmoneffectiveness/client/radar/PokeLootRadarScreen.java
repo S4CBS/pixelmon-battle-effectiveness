@@ -370,8 +370,13 @@ public class PokeLootRadarScreen extends Screen {
     }
 
     @Override
+    protected void renderBlurredBackground(float partialTick) {
+        // Disabled to prevent unwanted background blur
+    }
+
+    @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        this.renderBackground(guiGraphics, mouseX, mouseY, partialTick);
+        guiGraphics.fillGradient(0, 0, this.width, this.height, 0x88000000, 0x88000000);
 
         int left = (this.width - DIALOG_WIDTH) / 2;
         int top = (this.height - DIALOG_HEIGHT) / 2;
