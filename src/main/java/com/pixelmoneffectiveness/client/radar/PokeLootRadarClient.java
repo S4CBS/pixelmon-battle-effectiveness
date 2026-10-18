@@ -4,10 +4,12 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import com.pixelmonmod.pixelmon.Pixelmon;
 import com.pixelmonmod.pixelmon.api.events.PokeLootEvent;
+import com.pixelmonmod.pixelmon.api.pokemon.Pokemon;
 import com.pixelmonmod.pixelmon.api.util.LootClaim;
 import com.pixelmonmod.pixelmon.blocks.enums.EnumPokeChestType;
 import com.pixelmonmod.pixelmon.blocks.enums.EnumPokechestVisibility;
 import com.pixelmonmod.pixelmon.blocks.tileentity.PokeChestTileEntity;
+import com.pixelmonmod.pixelmon.entities.pixelmon.PixelmonEntity;
 import com.pixelmoneffectiveness.config.EffectivenessConfig;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Camera;
@@ -25,6 +27,7 @@ import org.joml.Matrix4f;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -58,7 +61,9 @@ public class PokeLootRadarClient {
     private static boolean radarActive = true;
     private static int scanCooldown = 0;
     private static List<PokeLootEntry> cachedEntries = new ArrayList<>();
+    private static List<PokemonRadarEntry> cachedPokemonEntries = new ArrayList<>();
     private static final Set<BlockPos> knownHighTierPositions = new HashSet<>();
+    private static final Set<UUID> knownSpecialPokemon = new HashSet<>();
     private static final Map<BlockPos, Long> localCooldownMap = new ConcurrentHashMap<>();
 
     public static boolean isRadarActive() {
@@ -91,6 +96,7 @@ public class PokeLootRadarClient {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null || mc.player == null) {
             cachedEntries.clear();
+            cachedPokemonEntries.clear();
             return;
         }
 
@@ -105,14 +111,15 @@ public class PokeLootRadarClient {
                 radarActive = !radarActive;
                 boolean isRu = mc.getLanguageManager().getSelected().toLowerCase(Locale.ROOT).startsWith("ru");
                 String text = radarActive
-                    ? (isRu ? "§e[Радар покелутов] §aВключен §7(K - настройки)" : "§e[PokéLoot Radar] §aEnabled §7(K for settings)")
-                    : (isRu ? "§e[Радар покелутов] §cВыключен §7(K - настройки)" : "§e[PokéLoot Radar] §cDisabled §7(K for settings)");
+                    ? (isRu ? "§e[Радар] §aВключен §7(K - настройки)" : "§e[Radar] §aEnabled §7(K for settings)")
+                    : (isRu ? "§e[Радар] §cВыключен §7(K - настройки)" : "§e[Radar] §cDisabled §7(K for settings)");
                 mc.player.displayClientMessage(Component.literal(text), true);
             }
         }
 
         if (!radarActive || (EffectivenessConfig.CONFIG != null && !EffectivenessConfig.CONFIG.radarEnabled.get())) {
             cachedEntries.clear();
+            cachedPokemonEntries.clear();
             return;
         }
 
@@ -250,7 +257,7 @@ public class PokeLootRadarClient {
             chunkRadius = Math.max(2, Math.min(24, EffectivenessConfig.CONFIG.radarScanRadius.get()));
         }
 
-        List<PokeLootEntry> found = new ArrayList<>();
+        List<PokeLootEntry> foundLoot = new ArrayList<>();
         boolean foundNewHighTier = false;
 
         for (int cx = pChunkX - chunkRadius; cx <= pChunkX + chunkRadius; cx++) {
@@ -285,7 +292,7 @@ public class PokeLootRadarClient {
                         double dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
                         double relAngle = calculateRelativeAngle(dx, dz, player.getYRot());
 
-                        found.add(new PokeLootEntry(pos, tier, isHidden, dist, relAngle));
+                        foundLoot.add(new PokeLootEntry(pos, tier, isHidden, dist, relAngle));
 
                         if ((tier == PokeLootTier.MASTER || tier == PokeLootTier.BEAST) && !knownHighTierPositions.contains(pos)) {
                             knownHighTierPositions.add(pos);
@@ -296,8 +303,88 @@ public class PokeLootRadarClient {
             }
         }
 
-        Collections.sort(found);
-        cachedEntries = found;
+        Collections.sort(foundLoot);
+        cachedEntries = foundLoot;
+
+        // Scan Pokémon entities
+        List<PokemonRadarEntry> foundPokemon = new ArrayList<>();
+        boolean pokeEnabled = EffectivenessConfig.CONFIG != null && EffectivenessConfig.CONFIG.pokemonRadarEnabled.get();
+        if (pokeEnabled) {
+            String filter = (EffectivenessConfig.CONFIG != null) ? EffectivenessConfig.CONFIG.pokemonSearchFilter.get().trim().toLowerCase(Locale.ROOT) : "";
+            boolean hasFilter = !filter.isEmpty();
+            String[] tokens = hasFilter ? filter.split("[,;]+") : new String[0];
+            boolean showRareWithoutFilter = EffectivenessConfig.CONFIG != null && EffectivenessConfig.CONFIG.pokemonShowRareWithoutFilter.get();
+
+            for (Entity entity : level.entitiesForRendering()) {
+                if (entity instanceof PixelmonEntity pixelmon && pixelmon.isAlive()) {
+                    if (pixelmon.getOwner() != null) {
+                        continue; // Wild only
+                    }
+
+                    Pokemon pokemon = pixelmon.getPokemon();
+                    if (pokemon == null) continue;
+
+                    boolean isShiny = pokemon.isShiny();
+                    boolean isLegendary = pokemon.isLegendary() || pokemon.isMythical() || pokemon.isUltraBeast();
+                    boolean isBoss = pokemon.isBoss();
+
+                    String displayName = pokemon.getDisplayName().getString();
+                    String speciesName = pokemon.getSpecies() != null ? pokemon.getSpecies().getName() : "";
+                    String translatedName = (pokemon.getSpecies() != null && pokemon.getSpecies().getNameTranslation() != null)
+                        ? pokemon.getSpecies().getNameTranslation().getString() : "";
+
+                    boolean matched = false;
+                    if (hasFilter) {
+                        String nameLower = displayName.toLowerCase(Locale.ROOT);
+                        String speciesLower = speciesName.toLowerCase(Locale.ROOT);
+                        String transLower = translatedName.toLowerCase(Locale.ROOT);
+                        for (String t : tokens) {
+                            String token = t.trim();
+                            if (!token.isEmpty() && (nameLower.contains(token) || speciesLower.contains(token) || transLower.contains(token))) {
+                                matched = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (matched || (!hasFilter && showRareWithoutFilter && (isShiny || isLegendary || isBoss))) {
+                        Vec3 pos = pixelmon.position();
+                        double dx = pos.x - player.getX();
+                        double dy = pos.y - player.getY();
+                        double dz = pos.z - player.getZ();
+                        double dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                        double relAngle = calculateRelativeAngle(dx, dz, player.getYRot());
+
+                        ResourceLocation sprite = null;
+                        try {
+                            sprite = pixelmon.getSprite();
+                        } catch (Throwable ignored) {}
+
+                        String display = (displayName != null && !displayName.isEmpty()) ? displayName : speciesName;
+
+                        foundPokemon.add(new PokemonRadarEntry(
+                            pos,
+                            display,
+                            pokemon.getPokemonLevel(),
+                            isShiny,
+                            isLegendary,
+                            isBoss,
+                            matched,
+                            sprite,
+                            dist,
+                            relAngle
+                        ));
+
+                        if ((isShiny || isLegendary) && !knownSpecialPokemon.contains(pixelmon.getUUID())) {
+                            knownSpecialPokemon.add(pixelmon.getUUID());
+                            foundNewHighTier = true;
+                        }
+                    }
+                }
+            }
+            Collections.sort(foundPokemon);
+        }
+        cachedPokemonEntries = foundPokemon;
 
         if (foundNewHighTier && EffectivenessConfig.CONFIG != null && EffectivenessConfig.CONFIG.radarSoundAlert.get()) {
             level.playSound(player, player.getX(), player.getY(), player.getZ(),
@@ -321,6 +408,14 @@ public class PokeLootRadarClient {
             double dx = entry.pos.getX() + 0.5 - player.getX();
             double dy = entry.pos.getY() + 0.5 - player.getY();
             double dz = entry.pos.getZ() + 0.5 - player.getZ();
+            entry.distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            entry.relativeAngle = calculateRelativeAngle(dx, dz, player.getYRot());
+        }
+
+        for (PokemonRadarEntry entry : cachedPokemonEntries) {
+            double dx = entry.pos.x - player.getX();
+            double dy = entry.pos.y - player.getY();
+            double dz = entry.pos.z - player.getZ();
             entry.distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
             entry.relativeAngle = calculateRelativeAngle(dx, dz, player.getYRot());
         }
@@ -351,7 +446,7 @@ public class PokeLootRadarClient {
         if (EffectivenessConfig.CONFIG != null && (!EffectivenessConfig.CONFIG.radarEnabled.get() || !EffectivenessConfig.CONFIG.radarHudEnabled.get())) {
             return;
         }
-        if (cachedEntries.isEmpty()) {
+        if (cachedEntries.isEmpty() && cachedPokemonEntries.isEmpty()) {
             return;
         }
 
@@ -365,10 +460,21 @@ public class PokeLootRadarClient {
 
         int screenWidth = guiGraphics.guiWidth();
         int padding = 6;
-        int boxWidth = 185;
-        int maxRows = Math.min(6, cachedEntries.size());
-        int boxHeight = 16 + maxRows * 11;
+        int boxWidth = 195;
 
+        int totalPoke = cachedPokemonEntries.size();
+        int totalLoot = cachedEntries.size();
+
+        int maxPokeRows = Math.min(totalPoke, totalLoot > 0 ? 5 : 8);
+        int maxLootRows = Math.min(totalLoot, totalPoke > 0 ? 5 : 8);
+        int totalRows = maxPokeRows + maxLootRows;
+        if (totalRows > 10) {
+            maxPokeRows = Math.min(maxPokeRows, 5);
+            maxLootRows = Math.min(10 - maxPokeRows, maxLootRows);
+            totalRows = maxPokeRows + maxLootRows;
+        }
+
+        int boxHeight = 16 + totalRows * 11;
         int startX = screenWidth - boxWidth - 10;
         int startY = 10;
 
@@ -381,12 +487,42 @@ public class PokeLootRadarClient {
 
         boolean isRu = mc.getLanguageManager().getSelected().toLowerCase(Locale.ROOT).startsWith("ru");
 
-        // Header
-        String title = (isRu ? "§e⚡ Радар PokéLoot §7(" : "§e⚡ PokéLoot Radar §7(") + cachedEntries.size() + ")";
+        // Header Title
+        String title;
+        if (totalLoot > 0 && totalPoke > 0) {
+            title = isRu ? ("§e⚡ Радар §7(" + totalLoot + " лут | " + totalPoke + " пок.)")
+                         : ("§e⚡ Radar §7(" + totalLoot + " loot | " + totalPoke + " poke)");
+        } else if (totalPoke > 0) {
+            title = (isRu ? "§e⚡ Радар Покемонов §7(" : "§e⚡ Pokémon Radar §7(") + totalPoke + ")";
+        } else {
+            title = (isRu ? "§e⚡ Радар PokéLoot §7(" : "§e⚡ PokéLoot Radar §7(") + totalLoot + ")";
+        }
         guiGraphics.drawString(font, title, startX + padding, startY + 4, 0xFFFFFFFF, false);
 
         int rowY = startY + 16;
-        for (int i = 0; i < maxRows; i++) {
+
+        // 1. Render Pokémon rows
+        for (int i = 0; i < maxPokeRows; i++) {
+            PokemonRadarEntry pe = cachedPokemonEntries.get(i);
+            String arrow = getDirectionArrow(pe.relativeAngle);
+            String distStr = (int) Math.round(pe.distance) + "m";
+            int yDiff = (int) Math.round(pe.pos.y) - mc.player.getBlockY();
+            String yTag = (yDiff > 2) ? " §7↑" : (yDiff < -2) ? " §7↓" : "";
+
+            String lvlTag = " §7" + (isRu ? "Ур." : "L.") + pe.level;
+            String matchTag = pe.isMatchedFilter ? " §a★" : "";
+            String leftText = pe.getPrefix() + " " + pe.name + lvlTag + matchTag;
+            String rightText = "§f" + distStr + yTag + " §b" + arrow;
+
+            guiGraphics.drawString(font, leftText, startX + padding, rowY, pe.getHudColor(), false);
+            int rightWidth = font.width(rightText);
+            guiGraphics.drawString(font, rightText, startX + boxWidth - padding - rightWidth, rowY, 0xFFFFFFFF, false);
+
+            rowY += 11;
+        }
+
+        // 2. Render PokéLoot rows
+        for (int i = 0; i < maxLootRows; i++) {
             PokeLootEntry entry = cachedEntries.get(i);
             String arrow = getDirectionArrow(entry.relativeAngle);
             String name = entry.tier.getDisplayName(isRu);
@@ -415,7 +551,7 @@ public class PokeLootRadarClient {
         if (EffectivenessConfig.CONFIG != null && (!EffectivenessConfig.CONFIG.radarEnabled.get() || !EffectivenessConfig.CONFIG.radarEsp3dEnabled.get())) {
             return;
         }
-        if (cachedEntries.isEmpty()) {
+        if (cachedEntries.isEmpty() && cachedPokemonEntries.isEmpty()) {
             return;
         }
 
@@ -429,6 +565,7 @@ public class PokeLootRadarClient {
         MultiBufferSource.BufferSource bufferSource = mc.renderBuffers().bufferSource();
         boolean isRu = mc.getLanguageManager().getSelected().toLowerCase(Locale.ROOT).startsWith("ru");
 
+        // 1. Render PokéLoot 3D ESP
         for (PokeLootEntry entry : cachedEntries) {
             if (entry.distance > 128.0) {
                 continue;
@@ -436,7 +573,7 @@ public class PokeLootRadarClient {
 
             float alpha = entry.isHidden ? 0.75f : 1.0f;
 
-            // 1. In-world see-through Pokéball icon right at the chest position (y + 0.35)
+            // In-world see-through Pokéball icon right at the chest position (y + 0.35)
             double cx = entry.pos.getX() + 0.5 - camPos.x;
             double cy = entry.pos.getY() + 0.35 - camPos.y;
             double cz = entry.pos.getZ() + 0.5 - camPos.z;
@@ -446,14 +583,13 @@ public class PokeLootRadarClient {
             poseStack.mulPose(Axis.YP.rotationDegrees(-camera.getYRot()));
             poseStack.mulPose(Axis.XP.rotationDegrees(camera.getXRot()));
 
-            // Size: 0.5 blocks when close, scales slightly with distance so it stays clearly visible
             float ballScale = (float) Math.max(0.5f, Math.min(1.4f, entry.distance * 0.04f));
             poseStack.scale(ballScale, -ballScale, ballScale);
 
             drawIcon(bufferSource, poseStack.last().pose(), entry.tier.getBallTexture(), -0.5f, -0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, alpha);
             poseStack.popPose();
 
-            // 2. Billboard text and icon floating above the chest (y + 1.2)
+            // Billboard text and icon floating above the chest (y + 1.2)
             double lx = entry.pos.getX() + 0.5 - camPos.x;
             double ly = entry.pos.getY() + 1.2 - camPos.y;
             double lz = entry.pos.getZ() + 0.5 - camPos.z;
@@ -472,7 +608,6 @@ public class PokeLootRadarClient {
             String label = entry.tier.getIconPrefix() + " " + name + " " + (int) Math.round(entry.distance) + "m" + hiddenTag;
             float textWidth = font.width(label);
 
-            // Icon above label (14x14 pixels)
             drawIcon(bufferSource, poseStack.last().pose(), entry.tier.getBallTexture(), -7f, -17f, 7f, -3f, 1.0f, 0.0f, 0.0f, 1.0f, alpha);
 
             font.drawInBatch(
@@ -480,6 +615,64 @@ public class PokeLootRadarClient {
                 -textWidth / 2f,
                 0,
                 entry.tier.getColorRgb(),
+                false,
+                poseStack.last().pose(),
+                bufferSource,
+                Font.DisplayMode.SEE_THROUGH,
+                0x88000000,
+                15728880
+            );
+
+            poseStack.popPose();
+        }
+
+        // 2. Render Pokémon 3D ESP
+        for (PokemonRadarEntry entry : cachedPokemonEntries) {
+            if (entry.distance > 128.0) {
+                continue;
+            }
+
+            // In-world see-through sprite icon at pokemon position
+            if (entry.sprite != null) {
+                double cx = entry.pos.x - camPos.x;
+                double cy = entry.pos.y + 0.6 - camPos.y;
+                double cz = entry.pos.z - camPos.z;
+
+                poseStack.pushPose();
+                poseStack.translate(cx, cy, cz);
+                poseStack.mulPose(Axis.YP.rotationDegrees(-camera.getYRot()));
+                poseStack.mulPose(Axis.XP.rotationDegrees(camera.getXRot()));
+
+                float iconScale = (float) Math.max(0.6f, Math.min(1.4f, entry.distance * 0.04f));
+                poseStack.scale(iconScale, -iconScale, iconScale);
+
+                drawIcon(bufferSource, poseStack.last().pose(), entry.sprite, -0.5f, -0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 0.95f);
+                poseStack.popPose();
+            }
+
+            // Billboard text floating above pokemon
+            double lx = entry.pos.x - camPos.x;
+            double ly = entry.pos.y + 1.3 - camPos.y;
+            double lz = entry.pos.z - camPos.z;
+
+            poseStack.pushPose();
+            poseStack.translate(lx, ly, lz);
+            poseStack.mulPose(Axis.YP.rotationDegrees(-camera.getYRot()));
+            poseStack.mulPose(Axis.XP.rotationDegrees(camera.getXRot()));
+
+            float scale = (float) Math.max(0.02f, Math.min(0.06f, entry.distance * 0.0025f));
+            poseStack.scale(-scale, -scale, scale);
+
+            String lvlStr = (isRu ? " Ур." : " Lv.") + entry.level;
+            String matchTag = entry.isMatchedFilter ? " ★" : "";
+            String label = entry.getPrefix() + " " + entry.name + lvlStr + " " + (int) Math.round(entry.distance) + "m" + matchTag;
+            float textWidth = font.width(label);
+
+            font.drawInBatch(
+                label,
+                -textWidth / 2f,
+                0,
+                entry.getHudColor(),
                 false,
                 poseStack.last().pose(),
                 bufferSource,

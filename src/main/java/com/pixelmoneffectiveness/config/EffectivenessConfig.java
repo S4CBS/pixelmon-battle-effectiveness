@@ -27,6 +27,9 @@ public class EffectivenessConfig {
     public final ModConfigSpec.BooleanValue searchSpecial;
     public final ModConfigSpec.BooleanValue searchPoke;
     public final ModConfigSpec.BooleanValue searchHidden;
+    public final ModConfigSpec.BooleanValue pokemonRadarEnabled;
+    public final ModConfigSpec.ConfigValue<String> pokemonSearchFilter;
+    public final ModConfigSpec.BooleanValue pokemonShowRareWithoutFilter;
 
     public final ModConfigSpec.BooleanValue overlayEnabled;
     public final ModConfigSpec.BooleanValue overlayAlwaysExpanded;
@@ -136,6 +139,21 @@ public class EffectivenessConfig {
             .comment("Искать скрытый лут (невидимые сундуки-покеболы).",
                      "Search for hidden Poké chests (invisible pokeballs).")
             .define("searchHidden", true);
+
+        pokemonRadarEnabled = builder
+            .comment("Включить поиск и отображение покемонов на радаре.",
+                     "Enable pokemon radar tracking.")
+            .define("pokemonRadarEnabled", true);
+
+        pokemonSearchFilter = builder
+            .comment("Фильтр поиска покемонов по имени (через запятую, напр. Pikachu, Ditto).",
+                     "Pokemon search filter by name (comma-separated).")
+            .define("pokemonSearchFilter", "");
+
+        pokemonShowRareWithoutFilter = builder
+            .comment("Отображать редких покемонов (Шайни, Легендарные, Боссы), если строка поиска пуста.",
+                     "Show rare pokemon (Shiny, Legendary, Boss) when search filter is empty.")
+            .define("pokemonShowRareWithoutFilter", true);
 
         builder.pop();
 
