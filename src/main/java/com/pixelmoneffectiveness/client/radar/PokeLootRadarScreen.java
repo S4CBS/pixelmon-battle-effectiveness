@@ -141,21 +141,21 @@ public class PokeLootRadarScreen extends Screen {
         .build();
         this.addRenderableWidget(pokeToggle);
 
-        boolean rareNoFilter = EffectivenessConfig.CONFIG != null && EffectivenessConfig.CONFIG.pokemonShowRareWithoutFilter.get();
-        String rareStatus = rareNoFilter ? (isRu ? "§aВКЛ" : "§aON") : (isRu ? "§cВЫКЛ" : "§cOFF");
-        String rareLabel = (isRu ? "Редкие б/фильтра: " : "Rare w/o filter: ") + rareStatus;
+        boolean rareAlways = EffectivenessConfig.CONFIG != null && EffectivenessConfig.CONFIG.pokemonShowRareWithoutFilter.get();
+        String rareStatus = rareAlways ? (isRu ? "§aВКЛ" : "§aON") : (isRu ? "§cВЫКЛ" : "§cOFF");
+        String rareLabel = (isRu ? "Редкие / Боссы: " : "Rare / Bosses: ") + rareStatus;
         Button rareToggle = Button.builder(
             Component.literal(rareLabel),
             btn -> {
                 if (EffectivenessConfig.CONFIG != null) {
-                    EffectivenessConfig.CONFIG.pokemonShowRareWithoutFilter.set(!rareNoFilter);
+                    EffectivenessConfig.CONFIG.pokemonShowRareWithoutFilter.set(!rareAlways);
                     EffectivenessConfig.SPEC.save();
                 }
                 rebuildScreen();
             }
         )
         .bounds(col2X, top + 158, btnWidth, 19)
-        .tooltip(Tooltip.create(Component.literal(isRu ? "Показывать Шайни, Легендарных и Боссов, даже если поиск пуст" : "Show Shiny, Legendary, and Bosses when search is empty")))
+        .tooltip(Tooltip.create(Component.literal(isRu ? "Всегда показывать Боссов, Шайни и Легендарных на радаре (даже если активен поиск)" : "Always show Bosses, Shinies, and Legendaries on radar (even with active filter)")))
         .build();
         this.addRenderableWidget(rareToggle);
 

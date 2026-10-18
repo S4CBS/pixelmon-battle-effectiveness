@@ -326,7 +326,33 @@ public class PokeLootRadarClient {
 
                     boolean isShiny = pokemon.isShiny();
                     boolean isLegendary = pokemon.isLegendary() || pokemon.isMythical() || pokemon.isUltraBeast();
-                    boolean isBoss = pokemon.isBoss();
+                    boolean isBoss = false;
+                    String bossTierName = null;
+                    int bossColor = 0;
+
+                    try {
+                        if (pixelmon.isBossPokemon()) {
+                            isBoss = true;
+                        }
+                        com.pixelmonmod.pixelmon.api.pokemon.boss.BossTier tier = pixelmon.getBossTier();
+                        if (tier != null && tier.isBoss()) {
+                            isBoss = true;
+                            if (tier.getName() != null) {
+                                bossTierName = Component.translatable(tier.getName()).getString();
+                            }
+                            if (tier.getColor() != null) {
+                                bossColor = tier.getColor().getRGB();
+                            }
+                        }
+                    } catch (Throwable ignored) {}
+
+                    if (!isBoss && pokemon != null) {
+                        try {
+                            if (pokemon.isBoss()) {
+                                isBoss = true;
+                            }
+                        } catch (Throwable ignored) {}
+                    }
 
                     String displayName = pokemon.getDisplayName().getString();
                     String speciesName = pokemon.getSpecies() != null ? pokemon.getSpecies().getName() : "";
@@ -338,16 +364,33 @@ public class PokeLootRadarClient {
                         String nameLower = displayName.toLowerCase(Locale.ROOT);
                         String speciesLower = speciesName.toLowerCase(Locale.ROOT);
                         String transLower = translatedName.toLowerCase(Locale.ROOT);
+                        String bossLower = (bossTierName != null) ? bossTierName.toLowerCase(Locale.ROOT) : "";
                         for (String t : tokens) {
                             String token = t.trim();
-                            if (!token.isEmpty() && (nameLower.contains(token) || speciesLower.contains(token) || transLower.contains(token))) {
+                            if (token.isEmpty()) continue;
+                            if (nameLower.contains(token) || speciesLower.contains(token) || transLower.contains(token)) {
+                                matched = true;
+                                break;
+                            }
+                            if (isBoss && (token.equals("босс") || token.equals("boss") || token.equals("боссы") || token.equals("bosses") || (!bossLower.isEmpty() && bossLower.contains(token)))) {
+                                matched = true;
+                                break;
+                            }
+                            if (isShiny && (token.equals("шайни") || token.equals("shiny") || token.equals("блестящий"))) {
+                                matched = true;
+                                break;
+                            }
+                            if (isLegendary && (token.equals("легенда") || token.equals("легендарный") || token.equals("legendary") || token.equals("мифик") || token.equals("mythical"))) {
                                 matched = true;
                                 break;
                             }
                         }
                     }
 
-                    if (matched || (!hasFilter && showRareWithoutFilter && (isShiny || isLegendary || isBoss))) {
+                    boolean isSpecial = isShiny || isLegendary || isBoss;
+                    boolean shouldInclude = matched || (showRareWithoutFilter && isSpecial);
+
+                    if (shouldInclude) {
                         Vec3 pos = pixelmon.position();
                         double dx = pos.x - player.getX();
                         double dy = pos.y - player.getY();
@@ -369,13 +412,15 @@ public class PokeLootRadarClient {
                             isShiny,
                             isLegendary,
                             isBoss,
+                            bossTierName,
+                            bossColor,
                             matched,
                             sprite,
                             dist,
                             relAngle
                         ));
 
-                        if ((isShiny || isLegendary) && !knownSpecialPokemon.contains(pixelmon.getUUID())) {
+                        if ((isShiny || isLegendary || isBoss) && !knownSpecialPokemon.contains(pixelmon.getUUID())) {
                             knownSpecialPokemon.add(pixelmon.getUUID());
                             foundNewHighTier = true;
                         }
@@ -460,7 +505,7 @@ public class PokeLootRadarClient {
 
         int screenWidth = guiGraphics.guiWidth();
         int padding = 6;
-        int boxWidth = 195;
+        int boxWidth = 225;
 
         int totalPoke = cachedPokemonEntries.size();
         int totalLoot = cachedEntries.size();
