@@ -4,6 +4,7 @@ import com.pixelmoneffectiveness.config.EffectivenessConfig;
 import com.pixelmoneffectiveness.client.overlay.PokemonOverlayClient;
 import com.pixelmoneffectiveness.client.radar.PokeLootRadarClient;
 import com.pixelmoneffectiveness.handler.ApricornTreeHarvestHandler;
+import com.pixelmoneffectiveness.handler.PokemonFreezeDespawnHandler;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
@@ -23,6 +24,8 @@ public class PixelmonEffectivenessMod {
         LOGGER.info("Initializing Pixelmon Battle Effectiveness mod");
         modContainer.registerConfig(ModConfig.Type.CLIENT, EffectivenessConfig.SPEC);
         NeoForge.EVENT_BUS.addListener(ApricornTreeHarvestHandler::onRightClickBlock);
+        NeoForge.EVENT_BUS.addListener(PokemonFreezeDespawnHandler::onEntityJoinLevel);
+        NeoForge.EVENT_BUS.addListener(PokemonFreezeDespawnHandler::onEntityTick);
 
         if (FMLEnvironment.dist == Dist.CLIENT) {
             PokeLootRadarClient.init(modEventBus);
