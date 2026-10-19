@@ -9,6 +9,9 @@ import com.pixelmonmod.pixelmon.api.util.LootClaim;
 import com.pixelmonmod.pixelmon.blocks.enums.EnumPokeChestType;
 import com.pixelmonmod.pixelmon.blocks.enums.EnumPokechestVisibility;
 import com.pixelmonmod.pixelmon.blocks.tileentity.PokeChestTileEntity;
+import com.pixelmonmod.pixelmon.battles.raids.RaidType;
+import com.pixelmonmod.pixelmon.battles.raids.data.RaidData;
+import com.pixelmonmod.pixelmon.entities.DenEntity;
 import com.pixelmonmod.pixelmon.entities.pixelmon.PixelmonEntity;
 import com.pixelmoneffectiveness.config.EffectivenessConfig;
 import com.mojang.blaze3d.vertex.VertexConsumer;
@@ -425,6 +428,108 @@ public class PokeLootRadarClient {
                             foundNewHighTier = true;
                         }
                     }
+                } else if (entity instanceof DenEntity den && den.isAlive()) {
+                    Optional<RaidData> optData = den.getData();
+                    if (!optData.isPresent()) continue;
+                    RaidData raidData = optData.get();
+                    Pokemon pokemon = raidData.getPokemon();
+                    if (pokemon == null) continue;
+
+                    int stars = raidData.getStars();
+                    if (stars <= 0) continue;
+
+                    boolean isShiny = pokemon.isShiny();
+                    boolean isLegendary = pokemon.isLegendary() || pokemon.isMythical() || pokemon.isUltraBeast();
+                    boolean isBoss = true;
+
+                    boolean isTera = false;
+                    try {
+                        if (raidData.getType() != null && raidData.getType().is(RaidType.TERA)) {
+                            isTera = true;
+                        }
+                    } catch (Throwable ignored) {}
+
+                    String displayName = pokemon.getDisplayName().getString();
+                    String speciesName = pokemon.getSpecies() != null ? pokemon.getSpecies().getName() : "";
+                    String translatedName = (pokemon.getSpecies() != null && pokemon.getSpecies().getNameTranslation() != null)
+                        ? pokemon.getSpecies().getNameTranslation().getString() : "";
+
+                    boolean matched = false;
+                    if (hasFilter) {
+                        String nameLower = displayName.toLowerCase(Locale.ROOT);
+                        String speciesLower = speciesName.toLowerCase(Locale.ROOT);
+                        String transLower = translatedName.toLowerCase(Locale.ROOT);
+                        for (String t : tokens) {
+                            String token = t.trim();
+                            if (token.isEmpty()) continue;
+                            if (nameLower.contains(token) || speciesLower.contains(token) || transLower.contains(token)) {
+                                matched = true;
+                                break;
+                            }
+                            if (token.equals("рейд") || token.equals("raid") || token.equals("рейды") || token.equals("raids") || token.equals("логово") || token.equals("ден")) {
+                                matched = true;
+                                break;
+                            }
+                            if (isLegendary && (token.equals("легенда") || token.equals("легендарный") || token.equals("legendary") || token.equals("мифик") || token.equals("mythical"))) {
+                                matched = true;
+                                break;
+                            }
+                            if (isShiny && (token.equals("шайни") || token.equals("shiny") || token.equals("блестящий"))) {
+                                matched = true;
+                                break;
+                            }
+                            if (token.equals("босс") || token.equals("boss") || token.equals("боссы") || token.equals("bosses")) {
+                                matched = true;
+                                break;
+                            }
+                            if (token.equals(stars + "*") || token.equals(stars + "★") || token.equals(stars + "звезд") || token.equals(stars + " звезд")) {
+                                matched = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    boolean isSpecial = isLegendary || isShiny || stars >= 4;
+                    boolean shouldInclude = matched || (showRareWithoutFilter && isSpecial);
+
+                    if (shouldInclude) {
+                        Vec3 pos = den.position();
+                        double dx = pos.x - player.getX();
+                        double dy = pos.y - player.getY();
+                        double dz = pos.z - player.getZ();
+                        double dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                        double relAngle = calculateRelativeAngle(dx, dz, player.getYRot());
+
+                        ResourceLocation sprite = null;
+                        try {
+                            sprite = pokemon.getSprite();
+                        } catch (Throwable ignored) {}
+
+                        String display = (displayName != null && !displayName.isEmpty()) ? displayName : speciesName;
+
+                        foundPokemon.add(new PokemonRadarEntry(
+                            pos,
+                            display,
+                            pokemon.getPokemonLevel(),
+                            isShiny,
+                            isLegendary,
+                            isBoss,
+                            stars + "★",
+                            isTera ? 0xFF00FFFF : 0xFFFF55FF,
+                            matched,
+                            sprite,
+                            dist,
+                            relAngle,
+                            true,
+                            stars,
+                            isTera
+                        ));
+
+                        if ((isLegendary || isShiny) && !knownSpecialPokemon.contains(den.getUUID())) {
+                            knownSpecialPokemon.add(den.getUUID());
+                            foundNewHighTier = true;
+                        }
+                    }
                 }
             }
             Collections.sort(foundPokemon);
@@ -680,7 +785,7 @@ public class PokeLootRadarClient {
             // In-world see-through sprite icon at pokemon position
             if (entry.sprite != null) {
                 double cx = entry.pos.x - camPos.x;
-                double cy = entry.pos.y + 0.6 - camPos.y;
+                double cy = entry.pos.y + (entry.isRaid ? 1.4 : 0.6) - camPos.y;
                 double cz = entry.pos.z - camPos.z;
 
                 poseStack.pushPose();
@@ -689,6 +794,9 @@ public class PokeLootRadarClient {
                 poseStack.mulPose(Axis.XP.rotationDegrees(camera.getXRot()));
 
                 float iconScale = (float) Math.max(0.6f, Math.min(1.4f, entry.distance * 0.04f));
+                if (entry.isRaid) {
+                    iconScale *= 1.3f;
+                }
                 poseStack.scale(iconScale, -iconScale, iconScale);
 
                 drawIcon(bufferSource, poseStack.last().pose(), entry.sprite, -0.5f, -0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, 0.95f);
@@ -697,7 +805,7 @@ public class PokeLootRadarClient {
 
             // Billboard text floating above pokemon
             double lx = entry.pos.x - camPos.x;
-            double ly = entry.pos.y + 1.3 - camPos.y;
+            double ly = entry.pos.y + (entry.isRaid ? 2.1 : 1.3) - camPos.y;
             double lz = entry.pos.z - camPos.z;
 
             poseStack.pushPose();

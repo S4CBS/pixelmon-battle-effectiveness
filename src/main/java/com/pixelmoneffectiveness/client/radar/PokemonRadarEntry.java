@@ -16,8 +16,15 @@ public class PokemonRadarEntry implements Comparable<PokemonRadarEntry> {
     public final ResourceLocation sprite;
     public double distance;
     public double relativeAngle;
+    public final boolean isRaid;
+    public final int raidStars;
+    public final boolean isTeraRaid;
 
     public PokemonRadarEntry(Vec3 pos, String name, int level, boolean isShiny, boolean isLegendary, boolean isBoss, String bossTierName, int bossColor, boolean isMatchedFilter, ResourceLocation sprite, double distance, double relativeAngle) {
+        this(pos, name, level, isShiny, isLegendary, isBoss, bossTierName, bossColor, isMatchedFilter, sprite, distance, relativeAngle, false, 0, false);
+    }
+
+    public PokemonRadarEntry(Vec3 pos, String name, int level, boolean isShiny, boolean isLegendary, boolean isBoss, String bossTierName, int bossColor, boolean isMatchedFilter, ResourceLocation sprite, double distance, double relativeAngle, boolean isRaid, int raidStars, boolean isTeraRaid) {
         this.pos = pos;
         this.name = name;
         this.level = level;
@@ -30,9 +37,20 @@ public class PokemonRadarEntry implements Comparable<PokemonRadarEntry> {
         this.sprite = sprite;
         this.distance = distance;
         this.relativeAngle = relativeAngle;
+        this.isRaid = isRaid;
+        this.raidStars = raidStars;
+        this.isTeraRaid = isTeraRaid;
     }
 
     public int getHudColor() {
+        if (isRaid) {
+            if (isLegendary) {
+                return isTeraRaid ? 0xFF55FFFF : 0xFFFF55FF; // Light Blue / Magenta
+            }
+            if (isShiny) return 0xFFFFD700; // Gold
+            if (isTeraRaid) return 0xFF55FFFF; // Cyan
+            return 0xFFFF5555; // Red
+        }
         if (isShiny) return 0xFFFFD700;      // Gold
         if (isLegendary) return 0xFFFF55FF;  // Light Purple / Magenta
         if (isBoss) {
@@ -46,6 +64,16 @@ public class PokemonRadarEntry implements Comparable<PokemonRadarEntry> {
     }
 
     public String getPrefix() {
+        if (isRaid) {
+            String starStr = raidStars > 0 ? (raidStars + "★") : "★";
+            if (isLegendary) {
+                return isTeraRaid ? "§b[💎 Рейд " + starStr + "]" : "§d[★ Рейд " + starStr + "]";
+            }
+            if (isShiny) {
+                return "§6[✨ Рейд " + starStr + "]";
+            }
+            return isTeraRaid ? "§b[💎 Рейд " + starStr + "]" : "§c[⚔ Рейд " + starStr + "]";
+        }
         if (isShiny) return "§6[✨]";
         if (isLegendary) return "§d[★]";
         if (isBoss) {
@@ -62,8 +90,13 @@ public class PokemonRadarEntry implements Comparable<PokemonRadarEntry> {
         if (this.isMatchedFilter != other.isMatchedFilter) {
             return this.isMatchedFilter ? -1 : 1;
         }
-        boolean thisSpecial = this.isShiny || this.isLegendary || this.isBoss;
-        boolean otherSpecial = other.isShiny || other.isLegendary || other.isBoss;
+        boolean thisLegendaryRaid = this.isRaid && this.isLegendary;
+        boolean otherLegendaryRaid = other.isRaid && other.isLegendary;
+        if (thisLegendaryRaid != otherLegendaryRaid) {
+            return thisLegendaryRaid ? -1 : 1;
+        }
+        boolean thisSpecial = this.isShiny || this.isLegendary || this.isBoss || this.isRaid;
+        boolean otherSpecial = other.isShiny || other.isLegendary || other.isBoss || other.isRaid;
         if (thisSpecial != otherSpecial) {
             return thisSpecial ? -1 : 1;
         }
