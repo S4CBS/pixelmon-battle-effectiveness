@@ -13,12 +13,15 @@ import com.pixelmonmod.pixelmon.comm.packetHandlers.storage.ServerboundSetSelect
 import com.pixelmonmod.pixelmon.entities.pixelmon.PixelmonEntity;
 import com.pixelmonmod.pixelmon.entities.pokeballs.OccupiedPokeBallEntity;
 import com.pixelmonmod.pixelmon.entities.pokeballs.PokeBallEntity;
+import com.pixelmoneffectiveness.client.autofarm.loot.ForageLootRegistry;
+import com.pixelmoneffectiveness.client.autofarm.loot.ForageLootScreen;
 import com.pixelmoneffectiveness.config.EffectivenessConfig;
 import net.minecraft.client.Camera;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.core.BlockPos;
@@ -49,6 +52,7 @@ import org.joml.Matrix4f;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 public class MintAutoFarmClient {
@@ -56,6 +60,12 @@ public class MintAutoFarmClient {
     public static final KeyMapping TOGGLE_AUTOFARM_KEY = new KeyMapping(
         "key.pixelmoneffectiveness.toggle_mint_farm",
         74, // GLFW_KEY_J
+        "key.categories.pixelmoneffectiveness"
+    );
+
+    public static final KeyMapping OPEN_AUTOFARM_FILTER_KEY = new KeyMapping(
+        "key.pixelmoneffectiveness.forage_loot_filter",
+        75, // GLFW_KEY_K
         "key.categories.pixelmoneffectiveness"
     );
 
@@ -84,6 +94,7 @@ public class MintAutoFarmClient {
 
     private static int seedsFound = 0;
     private static int mintsFound = 0;
+    private static int otherKeptFound = 0;
     private static int junkDropped = 0;
     private static String statusText = "Готов к запуску";
     private static boolean biomeWarning = false;
@@ -126,6 +137,7 @@ public class MintAutoFarmClient {
 
     public static void onRegisterKeyMappings(RegisterKeyMappingsEvent event) {
         event.register(TOGGLE_AUTOFARM_KEY);
+        event.register(OPEN_AUTOFARM_FILTER_KEY);
     }
 
     public static void onClientTick(ClientTickEvent.Post event) {
@@ -135,11 +147,19 @@ public class MintAutoFarmClient {
             return;
         }
 
+        while (OPEN_AUTOFARM_FILTER_KEY.consumeClick()) {
+            mc.setScreen(new ForageLootScreen(mc.screen));
+        }
+
         while (TOGGLE_AUTOFARM_KEY.consumeClick()) {
+            if (Screen.hasShiftDown()) {
+                mc.setScreen(new ForageLootScreen(mc.screen));
+                continue;
+            }
             setActive(!active);
             boolean isRu = isRussianLanguage(mc);
             String msg = active
-                ? (isRu ? "§a[Автофарм] §eВКЛЮЧЕН §7(J - выкл). Поиск наилучшего блока (Мох/Дёрн)..." : "§a[AutoFarm] §eENABLED §7(J to toggle). Searching for best block (Moss/Grass)...")
+                ? (isRu ? "§a[Автофарм] §eВКЛЮЧЕН §7(J - выкл, K - лут). Поиск блока (Мох/Дёрн)..." : "§a[AutoFarm] §eENABLED §7(J to toggle, K for loot). Searching block (Moss/Grass)...")
                 : (isRu ? "§e[Автофарм] §cВЫКЛЮЧЕН." : "§e[AutoFarm] §cDISABLED.");
             mc.player.displayClientMessage(Component.literal(msg), true);
         }
@@ -585,6 +605,12 @@ public class MintAutoFarmClient {
 
         boolean dropJunk = EffectivenessConfig.CONFIG == null || EffectivenessConfig.CONFIG.autoFarmDropNonMint.get();
 
+        Set<String> keepSet = null;
+        if (EffectivenessConfig.CONFIG != null) {
+            String filterStr = EffectivenessConfig.CONFIG.autoFarmKeepItemFilter.get();
+            keepSet = ForageLootRegistry.parseFilterString(filterStr);
+        }
+
         for (int slotId = 9; slotId <= 44; slotId++) {
             ItemStack current = mc.player.inventoryMenu.getSlot(slotId).getItem();
             if (current.isEmpty()) continue;
@@ -596,14 +622,18 @@ public class MintAutoFarmClient {
             if (isNew || countIncreased) {
                 int addedCount = isNew ? current.getCount() : (current.getCount() - before.getCount());
 
-                if (isMintItem(current)) {
-                    // Safe item! Keep it!
+                boolean isAllowed = ForageLootRegistry.isItemAllowed(current, keepSet);
+
+                if (isAllowed) {
                     if (isMintSeed(current)) {
                         seedsFound += addedCount;
                         sendChat(mc, "§a[Автофарм] §e+ Семена Мяты x" + addedCount + " §7(Всего семян: " + seedsFound + " шт.)");
-                    } else {
+                    } else if (isMintItem(current)) {
                         mintsFound += addedCount;
                         sendChat(mc, "§a[Автофарм] §d+ " + current.getHoverName().getString() + " x" + addedCount + " §7(Всего мяты: " + mintsFound + " шт.)");
+                    } else {
+                        otherKeptFound += addedCount;
+                        sendChat(mc, "§a[Автофарм] §b+ " + current.getHoverName().getString() + " x" + addedCount + " §7(Сохранено в инвентаре)");
                     }
                     mc.player.playSound(SoundEvents.PLAYER_LEVELUP, 1.0f, 1.2f);
                 } else if (dropJunk) {
@@ -830,8 +860,8 @@ public class MintAutoFarmClient {
 
         int panelX = 10;
         int panelY = 85;
-        int panelW = 215;
-        int panelH = biomeWarning ? 78 : 68;
+        int panelW = 224;
+        int panelH = biomeWarning ? 88 : 78;
 
         // Semi-transparent background with emerald/gold border
         int borderColor = (targetBlockScore >= 90) ? 0xFF2ECC71 : 0xFFF1C40F;
@@ -841,7 +871,7 @@ public class MintAutoFarmClient {
         graphics.fill(panelX, panelY, panelX + 1, panelY + panelH, borderColor);
         graphics.fill(panelX + panelW - 1, panelY, panelX + panelW, panelY + panelH, borderColor);
 
-        String title = isRu ? "§a☘ Автофарм Мяты §7(J - стоп)" : "§a☘ Mint Auto-Farm §7(J to stop)";
+        String title = isRu ? "§a☘ Автофарм Мяты §7(J - стоп, K - лут)" : "§a☘ Mint Auto-Farm §7(J stop, K loot)";
         graphics.drawString(font, title, panelX + 6, panelY + 5, 0xFFFFFFFF, true);
 
         String targetStr = String.format(Locale.ROOT, "§7%s: %s §f%s §7(%d★)",
@@ -858,9 +888,10 @@ public class MintAutoFarmClient {
         }
         graphics.drawString(font, st, panelX + 6, panelY + 29, 0xFFDDDDDD, true);
 
-        String stats1 = String.format(Locale.ROOT, "§e%s: §f%d §7| §d%s: §f%d",
-            (isRu ? "Семена" : "Seeds"), seedsFound,
-            (isRu ? "Мята" : "Mints"), mintsFound
+        String stats1 = String.format(Locale.ROOT, "§e%s: §f%d §7| §d%s: §f%d §7| §b%s: §f%d",
+            (isRu ? "Сем" : "Seed"), seedsFound,
+            (isRu ? "Мята" : "Mint"), mintsFound,
+            (isRu ? "Лут" : "Loot"), otherKeptFound
         );
         graphics.drawString(font, stats1, panelX + 6, panelY + 41, 0xFFFFFFFF, true);
 
@@ -869,9 +900,12 @@ public class MintAutoFarmClient {
         );
         graphics.drawString(font, stats2, panelX + 6, panelY + 53, 0xFFAAAAAA, true);
 
+        String hint = isRu ? "§8[K / Shift+J] — Настройка фильтра лута" : "§8[K / Shift+J] — Configure loot filter";
+        graphics.drawString(font, hint, panelX + 6, panelY + 65, 0xFF888888, true);
+
         if (biomeWarning) {
             String bioWarn = isRu ? "§c⚠ Биом запрещен для семян мяты!" : "§c⚠ Biome blocked for mint seeds!";
-            graphics.drawString(font, bioWarn, panelX + 6, panelY + 65, 0xFFFF5555, true);
+            graphics.drawString(font, bioWarn, panelX + 6, panelY + 77, 0xFFFF5555, true);
         }
     }
 

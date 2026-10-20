@@ -11,5 +11,6 @@
   "key.pixelmoneffectiveness.open_radar_gui": "Настройки радара PokéLoot",
   "key.pixelmoneffectiveness.open_overlay_settings": "Настройки инфо-панели покемона",
   "key.pixelmoneffectiveness.toggle_mint_farm": "Вкл/Выкл автофарм мяты",
+  "key.pixelmoneffectiveness.forage_loot_filter": "Фильтр лута Forage (Автофарм)",
   "key.categories.pixelmoneffectiveness": "Pixelmon Utilities"
 }

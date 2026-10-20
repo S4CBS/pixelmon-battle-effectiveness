@@ -45,6 +45,7 @@ public class EffectivenessConfig {
 
     public final ModConfigSpec.BooleanValue autoFarmDropNonMint;
     public final ModConfigSpec.BooleanValue autoFarmHudEnabled;
+    public final ModConfigSpec.ConfigValue<String> autoFarmKeepItemFilter;
 
     public EffectivenessConfig(ModConfigSpec.Builder builder) {
         builder.push("general");
@@ -227,6 +228,11 @@ public class EffectivenessConfig {
             .comment("Показывать инфо-панель со статистикой автофарма мяты на экране.",
                      "Show on-screen info HUD for mint auto-farm.")
             .define("hudEnabled", true);
+
+        autoFarmKeepItemFilter = builder
+            .comment("Список ID предметов, которые нужно сохранять при автофарме через Forage (через запятую). Поддерживает маски (*mint*).",
+                     "Comma-separated list of item IDs to keep during auto-farm Forage. Supports wildcards (*mint*).")
+            .define("keepItemFilter", "pixelmon:mint_seeds, pixelmon:*mint*");
 
         builder.pop();
     }
