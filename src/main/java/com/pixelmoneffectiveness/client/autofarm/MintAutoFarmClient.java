@@ -9,6 +9,7 @@ import com.pixelmonmod.pixelmon.client.keybindings.SendPokemonKey;
 import com.pixelmonmod.pixelmon.client.listener.SendoutListener;
 import com.pixelmonmod.pixelmon.client.storage.ClientStorageManager;
 import com.pixelmonmod.pixelmon.comm.packetHandlers.moveskills.UseMoveSkillPacket;
+import com.pixelmonmod.pixelmon.comm.packetHandlers.storage.ServerboundSetSelectedSlotPacket;
 import com.pixelmonmod.pixelmon.entities.pixelmon.PixelmonEntity;
 import com.pixelmonmod.pixelmon.entities.pokeballs.OccupiedPokeBallEntity;
 import com.pixelmonmod.pixelmon.entities.pokeballs.PokeBallEntity;
@@ -240,7 +241,7 @@ public class MintAutoFarmClient {
                             stateTimer = 2;
                             return;
                         }
-                        party.setSelectedSlot(readySlot, true);
+                        selectPartySlot(party, readySlot);
                     }
 
                     Pokemon selected = party.getSelectedPokemon();
@@ -465,7 +466,7 @@ public class MintAutoFarmClient {
             case CYCLE_SLOT -> {
                 if (party.countAll() > 1) {
                     int nextSlot = (party.getSelectedSlot() + 1) % party.countAll();
-                    party.setSelectedSlot(nextSlot, true);
+                    selectPartySlot(party, nextSlot);
                     statusText = "Смена на слот " + (nextSlot + 1) + "...";
                 }
                 state = State.SELECT_POKEMON;
@@ -475,6 +476,25 @@ public class MintAutoFarmClient {
             case IDLE -> {
                 // Do nothing
             }
+        }
+    }
+
+    /**
+     * Safely changes the selected party slot on the client.
+     * Note: Calling party.setSelectedSlot(slot, true) in Pixelmon 9.4.1 crashes with NoSuchMethodError
+     * because Pixelmon internally calls sendClientUpdateSelectedPacket() which is annotated with @OnlyIn(Dist.DEDICATED_SERVER)
+     * and stripped on the client by NeoForge runtimedistcleaner.
+     * Passing false sets the slot without invoking the server-only method, and we then notify the server via packet.
+     */
+    public static void selectPartySlot(PlayerPartyStorage party, int slot) {
+        if (party == null) return;
+        party.setSelectedSlot(slot, false);
+        try {
+            NetworkHelper.sendToServer(new ServerboundSetSelectedSlotPacket(slot));
+        } catch (Throwable t) {
+            try {
+                party.sendClientUpdatePacket();
+            } catch (Throwable ignored) {}
         }
     }
 
