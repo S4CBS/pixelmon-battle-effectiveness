@@ -9,6 +9,9 @@ import com.pixelmonmod.pixelmon.client.keybindings.SendPokemonKey;
 import com.pixelmonmod.pixelmon.client.listener.SendoutListener;
 import com.pixelmonmod.pixelmon.client.storage.ClientStorageManager;
 import com.pixelmonmod.pixelmon.comm.packetHandlers.moveskills.UseMoveSkillPacket;
+import com.pixelmonmod.pixelmon.entities.pixelmon.PixelmonEntity;
+import com.pixelmonmod.pixelmon.entities.pokeballs.OccupiedPokeBallEntity;
+import com.pixelmonmod.pixelmon.entities.pokeballs.PokeBallEntity;
 import com.pixelmoneffectiveness.config.EffectivenessConfig;
 import net.minecraft.client.Camera;
 import net.minecraft.client.KeyMapping;
@@ -26,6 +29,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.biome.Biome;
@@ -44,6 +48,7 @@ import org.joml.Matrix4f;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 
 public class MintAutoFarmClient {
 
@@ -58,10 +63,14 @@ public class MintAutoFarmClient {
         FIND_BEST_BLOCK,
         SELECT_POKEMON,
         SPAWN_POKEMON,
+        WAIT_FOR_SPAWN,
+        READY_TO_FORAGE,
         FORAGING,
         WAIT_FOR_LOOT,
         CLEAN_INVENTORY,
         RECALL_POKEMON,
+        WAIT_FOR_RECALL,
+        CYCLE_SLOT,
         COOLDOWN_WAIT
     }
 
@@ -78,6 +87,10 @@ public class MintAutoFarmClient {
     private static String statusText = "Готов к запуску";
     private static boolean biomeWarning = false;
 
+    private static long lastThrowTime = 0;
+    private static int spawnWaitTicks = 0;
+    private static int recallWaitTicks = 0;
+
     // Snapshot of player inventory (slots 9 to 44) before each forage
     private static final Map<Integer, ItemStack> inventorySnapshot = new HashMap<>();
 
@@ -91,10 +104,15 @@ public class MintAutoFarmClient {
             state = State.IDLE;
             statusText = "Выключен";
             targetBlockPos = null;
+            spawnWaitTicks = 0;
+            recallWaitTicks = 0;
         } else {
             state = State.FIND_BEST_BLOCK;
             stateTimer = 0;
             statusText = "Поиск наилучшего блока...";
+            lastThrowTime = 0;
+            spawnWaitTicks = 0;
+            recallWaitTicks = 0;
         }
     }
 
@@ -166,16 +184,16 @@ public class MintAutoFarmClient {
                     stateTimer = 20; // Recheck in 1 second
                     return;
                 }
-                BlockState state = mc.level.getBlockState(targetBlockPos);
-                targetBlockScore = getBlockScore(state);
-                targetBlockName = state.getBlock().getName().getString();
+                BlockState bState = mc.level.getBlockState(targetBlockPos);
+                targetBlockScore = getBlockScore(bState);
+                targetBlockName = bState.getBlock().getName().getString();
                 statusText = "Выбран: " + targetBlockName + " (" + targetBlockScore + "★)";
-                MintAutoFarmClient.state = State.SELECT_POKEMON;
+                state = State.SELECT_POKEMON;
                 stateTimer = 2;
             }
 
             case SELECT_POKEMON -> {
-                // Verify block is still valid or find an even better one (e.g. if player placed moss)
+                // Verify block is still valid or find an even better one
                 targetBlockPos = findBestForageBlock(mc);
                 if (targetBlockPos == null) {
                     state = State.FIND_BEST_BLOCK;
@@ -189,6 +207,9 @@ public class MintAutoFarmClient {
                 int currentSlot = party.getSelectedSlot();
                 int readySlot = -1;
                 int minCooldown = Integer.MAX_VALUE;
+
+                // Check if any Pokémon from player is already in world
+                PixelmonEntity anyInWorld = getAnyPartyPokemonInWorld(mc, party);
 
                 // Check current slot first
                 Pokemon currentPoke = party.getSelectedPokemon();
@@ -213,13 +234,36 @@ public class MintAutoFarmClient {
 
                 if (readySlot != -1) {
                     if (readySlot != currentSlot) {
+                        // If another pokemon is out in the world, recall it first!
+                        if (anyInWorld != null) {
+                            state = State.RECALL_POKEMON;
+                            stateTimer = 2;
+                            return;
+                        }
                         party.setSelectedSlot(readySlot, true);
                     }
+
                     Pokemon selected = party.getSelectedPokemon();
-                    String pokeName = selected != null ? selected.getDisplayName().getString() : "Покемон";
-                    statusText = "Готов: " + pokeName + " -> " + targetBlockName;
-                    state = State.SPAWN_POKEMON;
-                    stateTimer = 4;
+                    if (selected == null) {
+                        stateTimer = 5;
+                        return;
+                    }
+
+                    // Check if selected pokemon is ALREADY summoned in world
+                    PixelmonEntity selectedEntity = getPlayerPokemonEntity(mc, selected);
+                    if (selectedEntity != null && selectedEntity.isAlive()) {
+                        statusText = selected.getDisplayName().getString() + " уже в мире. Готов!";
+                        state = State.READY_TO_FORAGE;
+                        stateTimer = 2;
+                    } else if (anyInWorld != null) {
+                        // Some other pokemon is out, recall it first
+                        state = State.RECALL_POKEMON;
+                        stateTimer = 2;
+                    } else {
+                        statusText = "Выбран: " + selected.getDisplayName().getString() + " -> " + targetBlockName;
+                        state = State.SPAWN_POKEMON;
+                        stateTimer = 2;
+                    }
                 } else {
                     int sec = (minCooldown + 19) / 20;
                     statusText = "Откат пачки: " + sec + "с (покемонов: " + party.countPokemon() + ")";
@@ -240,18 +284,95 @@ public class MintAutoFarmClient {
                     return;
                 }
 
-                String pName = p.getDisplayName().getString();
-                boolean inWorld = SendoutListener.isInWorld(p.getUUID(), mc.level);
-                if (!inWorld) {
-                    SendPokemonKey.sendPokemon();
-                    statusText = "Выпускаем " + pName + "...";
-                    state = State.FORAGING;
-                    stateTimer = 14; // Wait for spawn
-                } else {
-                    statusText = pName + " в мире. Копаем " + targetBlockName + "...";
-                    state = State.FORAGING;
+                // Check if already in world
+                PixelmonEntity existing = getPlayerPokemonEntity(mc, p);
+                if (existing != null && existing.isAlive()) {
+                    state = State.READY_TO_FORAGE;
                     stateTimer = 2;
+                    return;
                 }
+
+                // Check if pokeball is already flying
+                if (isPokeballInFlight(mc, p)) {
+                    statusText = "Покебол уже в воздухе, ждем...";
+                    state = State.WAIT_FOR_SPAWN;
+                    spawnWaitTicks = 0;
+                    stateTimer = 5;
+                    return;
+                }
+
+                // Anti-spam cooldown check (minimum 2.5 seconds between throws)
+                long now = System.currentTimeMillis();
+                if (now - lastThrowTime < 2500) {
+                    statusText = "Ожидание перед броском...";
+                    stateTimer = 5;
+                    return;
+                }
+
+                // Throw Pokéball exactly ONCE
+                SendPokemonKey.sendPokemon();
+                lastThrowTime = now;
+                spawnWaitTicks = 0;
+                String pName = p.getDisplayName().getString();
+                statusText = "Бросок покебола: " + pName + "...";
+                state = State.WAIT_FOR_SPAWN;
+                stateTimer = 5;
+            }
+
+            case WAIT_FOR_SPAWN -> {
+                Pokemon p = party.getSelectedPokemon();
+                if (p == null || p.isEgg()) {
+                    state = State.SELECT_POKEMON;
+                    return;
+                }
+
+                spawnWaitTicks++;
+
+                // Check if entity is now present in world
+                PixelmonEntity pe = getPlayerPokemonEntity(mc, p);
+                if (pe != null && pe.isAlive()) {
+                    statusText = pe.getDisplayName().getString() + " появился! Подготовка...";
+                    state = State.READY_TO_FORAGE;
+                    stateTimer = 8; // 0.4s for landing and animation settling
+                    return;
+                }
+
+                boolean flying = isPokeballInFlight(mc, p);
+                if (flying) {
+                    statusText = "Покебол в полете... (" + String.format(Locale.ROOT, "%.1f", spawnWaitTicks / 20.0) + "с)";
+                } else {
+                    statusText = "Ожидание спавна: " + p.getDisplayName().getString() + "... (" + spawnWaitTicks + ")";
+                }
+
+                // Timeout after 100 ticks (5 seconds)
+                if (spawnWaitTicks > 100) {
+                    statusText = "§cТаймаут спавна! Перепроверка...";
+                    state = State.SELECT_POKEMON;
+                    stateTimer = 20; // Wait 1 second before retrying
+                    return;
+                }
+
+                stateTimer = 1; // Recheck every tick
+            }
+
+            case READY_TO_FORAGE -> {
+                Pokemon p = party.getSelectedPokemon();
+                if (p == null || p.isEgg()) {
+                    state = State.SELECT_POKEMON;
+                    return;
+                }
+
+                PixelmonEntity pe = getPlayerPokemonEntity(mc, p);
+                if (pe == null || !pe.isAlive()) {
+                    statusText = "Покемон не обнаружен!";
+                    state = State.SELECT_POKEMON;
+                    stateTimer = 10;
+                    return;
+                }
+
+                statusText = p.getDisplayName().getString() + " готов. Цель: " + targetBlockName;
+                state = State.FORAGING;
+                stateTimer = 2;
             }
 
             case FORAGING -> {
@@ -261,10 +382,11 @@ public class MintAutoFarmClient {
                     return;
                 }
 
-                boolean inWorld = SendoutListener.isInWorld(p.getUUID(), mc.level);
-                if (!inWorld) {
-                    // Try to send out again or wait
-                    SendPokemonKey.sendPokemon();
+                PixelmonEntity pe = getPlayerPokemonEntity(mc, p);
+                if (pe == null || !pe.isAlive()) {
+                    // DO NOT call sendPokemon()!
+                    statusText = "Покемон пропал перед добычей!";
+                    state = State.SELECT_POKEMON;
                     stateTimer = 10;
                     return;
                 }
@@ -292,8 +414,8 @@ public class MintAutoFarmClient {
 
                 statusText = p.getDisplayName().getString() + " копает [" + targetBlockName + "]...";
                 state = State.WAIT_FOR_LOOT;
-                // Wait 25 ticks (1.25s) for forage animation, item drop and player pickup
-                stateTimer = 25;
+                // Wait 35 ticks (1.75s) for forage animation, item drop and player pickup
+                stateTimer = 35;
             }
 
             case WAIT_FOR_LOOT -> {
@@ -308,27 +430,123 @@ public class MintAutoFarmClient {
             }
 
             case RECALL_POKEMON -> {
-                Pokemon p = party.getSelectedPokemon();
-                if (p != null) {
-                    boolean inWorld = SendoutListener.isInWorld(p.getUUID(), mc.level);
-                    if (inWorld) {
-                        SendPokemonKey.sendPokemon();
-                    }
+                PixelmonEntity pe = getAnyPartyPokemonInWorld(mc, party);
+                if (pe != null && pe.isAlive()) {
+                    SendPokemonKey.sendPokemon();
+                    statusText = "Отзываем " + pe.getDisplayName().getString() + "...";
+                    state = State.WAIT_FOR_RECALL;
+                    recallWaitTicks = 0;
+                    stateTimer = 5;
+                } else {
+                    state = State.CYCLE_SLOT;
+                    stateTimer = 2;
+                }
+            }
+
+            case WAIT_FOR_RECALL -> {
+                recallWaitTicks++;
+                PixelmonEntity pe = getAnyPartyPokemonInWorld(mc, party);
+                if (pe == null || !pe.isAlive()) {
+                    statusText = "Покемон отозван.";
+                    state = State.CYCLE_SLOT;
+                    stateTimer = 4;
+                    return;
                 }
 
-                // Cycle to next pokemon in party
-                int nextSlot = (party.getSelectedSlot() + 1) % party.countAll();
-                party.setSelectedSlot(nextSlot, true);
+                if (recallWaitTicks > 40) { // 2 seconds timeout
+                    state = State.CYCLE_SLOT;
+                    stateTimer = 2;
+                    return;
+                }
 
-                statusText = "Смена на слот " + (nextSlot + 1) + "...";
+                stateTimer = 1;
+            }
+
+            case CYCLE_SLOT -> {
+                if (party.countAll() > 1) {
+                    int nextSlot = (party.getSelectedSlot() + 1) % party.countAll();
+                    party.setSelectedSlot(nextSlot, true);
+                    statusText = "Смена на слот " + (nextSlot + 1) + "...";
+                }
                 state = State.SELECT_POKEMON;
-                stateTimer = 5;
+                stateTimer = 4;
             }
 
             case IDLE -> {
                 // Do nothing
             }
         }
+    }
+
+    /**
+     * Resolves the Minecraft entity for the given Pokemon in the client level.
+     * Uses both SendoutListener and direct client entity scanning.
+     */
+    public static PixelmonEntity getPlayerPokemonEntity(Minecraft mc, Pokemon p) {
+        if (mc.level == null || p == null) return null;
+        UUID uuid = p.getUUID();
+
+        // 1. Check SendoutListener map
+        PixelmonEntity listenerEntity = SendoutListener.getEntityInWorld(uuid, mc.level);
+        if (listenerEntity != null && listenerEntity.isAlive() && !listenerEntity.isRemoved()) {
+            return listenerEntity;
+        }
+
+        // 2. Direct client level iteration
+        for (Entity entity : mc.level.entitiesForRendering()) {
+            if (entity instanceof PixelmonEntity pe && pe.isAlive() && !pe.isRemoved()) {
+                if (uuid.equals(pe.getUUID())) {
+                    return pe;
+                }
+                if (pe.getOwner() == mc.player && pe.getPokemon() != null && uuid.equals(pe.getPokemon().getUUID())) {
+                    return pe;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Finds any Pokémon from player's party that is currently summoned in the client level.
+     */
+    public static PixelmonEntity getAnyPartyPokemonInWorld(Minecraft mc, PlayerPartyStorage party) {
+        if (mc.level == null || party == null) return null;
+        for (int i = 0; i < party.countAll(); i++) {
+            Pokemon p = party.get(i);
+            if (p == null) continue;
+            PixelmonEntity pe = getPlayerPokemonEntity(mc, p);
+            if (pe != null && pe.isAlive() && !pe.isRemoved()) {
+                return pe;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Checks if a Pokéball thrown by the player is currently in flight or animating in the world.
+     */
+    public static boolean isPokeballInFlight(Minecraft mc, Pokemon p) {
+        if (mc.level == null || mc.player == null) return false;
+        UUID pUuid = (p != null) ? p.getUUID() : null;
+
+        for (Entity entity : mc.level.entitiesForRendering()) {
+            if (!entity.isAlive() || entity.isRemoved()) continue;
+
+            if (entity instanceof OccupiedPokeBallEntity ball) {
+                if (ball.getThrower() == mc.player || mc.player.getUUID().equals(ball.getOwnerId())) {
+                    if (pUuid == null || ball.getPokeUUID() == null || pUuid.equals(ball.getPokeUUID())) {
+                        return true;
+                    }
+                }
+            } else if (entity instanceof PokeBallEntity ball) {
+                if (ball.getThrower() == mc.player || mc.player.getUUID().equals(ball.getOwnerId())) {
+                    if (pUuid == null || ball.getPokeUUID() == null || pUuid.equals(ball.getPokeUUID())) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     private static void takeInventorySnapshot(Minecraft mc) {
