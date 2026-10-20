@@ -43,6 +43,9 @@ public class EffectivenessConfig {
     public final ModConfigSpec.IntValue overlayTextColor;
     public final ModConfigSpec.DoubleValue overlayReachDistance;
 
+    public final ModConfigSpec.BooleanValue autoFarmDropNonMint;
+    public final ModConfigSpec.BooleanValue autoFarmHudEnabled;
+
     public EffectivenessConfig(ModConfigSpec.Builder builder) {
         builder.push("general");
 
@@ -210,6 +213,20 @@ public class EffectivenessConfig {
             .comment("Максимальная дистанция обнаружения покемона в блоках (от 4 до 48).",
                      "Max Pokémon detection reach distance in blocks (4 to 48).")
             .defineInRange("reachDistance", 24.0, 4.0, 48.0);
+
+        builder.pop();
+
+        builder.push("autofarm");
+
+        autoFarmDropNonMint = builder
+            .comment("Автоматически выбрасывать весь мусор из инвентаря, кроме мяты и семян мяты при фуражировании.",
+                     "Automatically drop all junk items from inventory except mint and mint seeds during foraging.")
+            .define("dropNonMint", true);
+
+        autoFarmHudEnabled = builder
+            .comment("Показывать инфо-панель со статистикой автофарма мяты на экране.",
+                     "Show on-screen info HUD for mint auto-farm.")
+            .define("hudEnabled", true);
 
         builder.pop();
     }

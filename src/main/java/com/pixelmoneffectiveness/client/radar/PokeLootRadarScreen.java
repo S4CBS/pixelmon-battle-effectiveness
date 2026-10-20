@@ -249,10 +249,10 @@ public class PokeLootRadarScreen extends Screen {
         .build();
         this.addRenderableWidget(sndToggle);
 
-        // Row 8: Hide on Cooldown toggle
+        // Row 8: Hide on Cooldown toggle & Mint Auto-Farm toggle
         boolean hideCd = EffectivenessConfig.CONFIG != null && EffectivenessConfig.CONFIG.radarHideOnCooldown.get();
-        String cdStatus = hideCd ? (isRu ? "§aВКЛ (Скрывать)" : "§aON (Hide)") : (isRu ? "§cВЫКЛ (Показывать)" : "§cOFF (Show)");
-        String cdLabel = (isRu ? "Сундуки на КД: " : "Chests on CD: ") + cdStatus;
+        String cdStatus = hideCd ? (isRu ? "§aВКЛ" : "§aON") : (isRu ? "§cВЫКЛ" : "§cOFF");
+        String cdLabel = (isRu ? "Скрывать КД: " : "Hide on CD: ") + cdStatus;
         Button cdToggle = Button.builder(
             Component.literal(cdLabel),
             btn -> {
@@ -263,10 +263,25 @@ public class PokeLootRadarScreen extends Screen {
                 rebuildScreen();
             }
         )
-        .bounds(left + 10, top + 259, 250, 19)
+        .bounds(col1X, top + 259, btnWidth, 19)
         .tooltip(Tooltip.create(Component.literal(isRu ? "Автоматически скрывать с радара залутанные сундуки на перезарядке" : "Automatically hide looted chests on cooldown from radar")))
         .build();
         this.addRenderableWidget(cdToggle);
+
+        boolean farmOn = com.pixelmoneffectiveness.client.autofarm.MintAutoFarmClient.isActive();
+        String farmStatus = farmOn ? (isRu ? "§aВКЛ" : "§aON") : (isRu ? "§cВЫКЛ" : "§cOFF");
+        String farmLabel = (isRu ? "☘ Фарм мяты: " : "☘ Mint Farm: ") + farmStatus;
+        Button farmToggle = Button.builder(
+            Component.literal(farmLabel),
+            btn -> {
+                com.pixelmoneffectiveness.client.autofarm.MintAutoFarmClient.setActive(!farmOn);
+                rebuildScreen();
+            }
+        )
+        .bounds(col2X, top + 259, btnWidth, 19)
+        .tooltip(Tooltip.create(Component.literal(isRu ? "Автофарм семян мяты (горячая клавиша: J). Автоматически копает дёрн и выбрасывает мусор." : "Mint seeds auto-farm (hotkey: J). Automatically forages grass and drops junk.")))
+        .build();
+        this.addRenderableWidget(farmToggle);
 
         // --- Bottom Actions ---
         Button overlayBtn = Button.builder(
