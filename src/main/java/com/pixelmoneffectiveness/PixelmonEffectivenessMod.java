@@ -5,6 +5,7 @@ import com.pixelmoneffectiveness.client.autofarm.MintAutoFarmClient;
 import com.pixelmoneffectiveness.client.overlay.PokemonOverlayClient;
 import com.pixelmoneffectiveness.client.radar.PokeLootRadarClient;
 import com.pixelmoneffectiveness.handler.ApricornTreeHarvestHandler;
+import com.pixelmoneffectiveness.handler.DittoDisguiseHandler;
 import com.pixelmoneffectiveness.handler.PokemonFreezeDespawnHandler;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
@@ -27,6 +28,12 @@ public class PixelmonEffectivenessMod {
         NeoForge.EVENT_BUS.addListener(ApricornTreeHarvestHandler::onRightClickBlock);
         NeoForge.EVENT_BUS.addListener(PokemonFreezeDespawnHandler::onEntityJoinLevel);
         NeoForge.EVENT_BUS.addListener(PokemonFreezeDespawnHandler::onEntityTick);
+        NeoForge.EVENT_BUS.addListener(DittoDisguiseHandler::onEntityJoinLevel);
+        try {
+            com.pixelmonmod.pixelmon.Pixelmon.EVENT_BUS.addListener(DittoDisguiseHandler::onSuccessfulCapture);
+        } catch (Throwable t) {
+            LOGGER.warn("Failed to register Pixelmon capture listener for Ditto", t);
+        }
 
         if (FMLEnvironment.dist == Dist.CLIENT) {
             PokeLootRadarClient.init(modEventBus);

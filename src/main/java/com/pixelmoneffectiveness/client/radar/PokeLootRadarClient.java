@@ -362,6 +362,10 @@ public class PokeLootRadarClient {
                     String translatedName = (pokemon.getSpecies() != null && pokemon.getSpecies().getNameTranslation() != null)
                         ? pokemon.getSpecies().getNameTranslation().getString() : "";
 
+                    boolean trackDitto = EffectivenessConfig.CONFIG == null || EffectivenessConfig.CONFIG.pokemonRadarTrackDitto.get();
+                    boolean isConfirmedDitto = trackDitto && DittoDisguiseHelper.isConfirmedDitto(pixelmon);
+                    boolean isDittoDisguise = trackDitto && DittoDisguiseHelper.isDittoDisguiseCandidate(pokemon);
+
                     boolean matched = false;
                     if (hasFilter) {
                         String nameLower = displayName.toLowerCase(Locale.ROOT);
@@ -374,6 +378,12 @@ public class PokeLootRadarClient {
                             if (nameLower.contains(token) || speciesLower.contains(token) || transLower.contains(token)) {
                                 matched = true;
                                 break;
+                            }
+                            if (trackDitto && DittoDisguiseHelper.isDittoFilterToken(token)) {
+                                if (isConfirmedDitto || isDittoDisguise || "Ditto".equalsIgnoreCase(speciesName) || "ditto".equalsIgnoreCase(displayName)) {
+                                    matched = true;
+                                    break;
+                                }
                             }
                             if (isBoss && (token.equals("босс") || token.equals("boss") || token.equals("боссы") || token.equals("bosses") || (!bossLower.isEmpty() && bossLower.contains(token)))) {
                                 matched = true;
@@ -390,7 +400,7 @@ public class PokeLootRadarClient {
                         }
                     }
 
-                    boolean isSpecial = isShiny || isLegendary || isBoss;
+                    boolean isSpecial = isShiny || isLegendary || isBoss || isConfirmedDitto;
                     boolean shouldInclude = matched || (showRareWithoutFilter && isSpecial);
 
                     if (shouldInclude) {
@@ -403,7 +413,11 @@ public class PokeLootRadarClient {
 
                         ResourceLocation sprite = null;
                         try {
-                            sprite = pixelmon.getSprite();
+                            if (isConfirmedDitto) {
+                                sprite = DittoDisguiseHelper.getDittoSprite();
+                            } else {
+                                sprite = pixelmon.getSprite();
+                            }
                         } catch (Throwable ignored) {}
 
                         String display = (displayName != null && !displayName.isEmpty()) ? displayName : speciesName;
@@ -420,10 +434,15 @@ public class PokeLootRadarClient {
                             matched,
                             sprite,
                             dist,
-                            relAngle
+                            relAngle,
+                            false,
+                            0,
+                            false,
+                            isConfirmedDitto,
+                            isDittoDisguise
                         ));
 
-                        if ((isShiny || isLegendary || isBoss) && !knownSpecialPokemon.contains(pixelmon.getUUID())) {
+                        if ((isShiny || isLegendary || isBoss || isConfirmedDitto) && !knownSpecialPokemon.contains(pixelmon.getUUID())) {
                             knownSpecialPokemon.add(pixelmon.getUUID());
                             foundNewHighTier = true;
                         }

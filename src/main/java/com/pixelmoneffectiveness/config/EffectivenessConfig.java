@@ -30,6 +30,7 @@ public class EffectivenessConfig {
     public final ModConfigSpec.BooleanValue pokemonRadarEnabled;
     public final ModConfigSpec.ConfigValue<String> pokemonSearchFilter;
     public final ModConfigSpec.BooleanValue pokemonShowRareWithoutFilter;
+    public final ModConfigSpec.BooleanValue pokemonRadarTrackDitto;
 
     public final ModConfigSpec.BooleanValue overlayEnabled;
     public final ModConfigSpec.BooleanValue overlayAlwaysExpanded;
@@ -163,6 +164,11 @@ public class EffectivenessConfig {
             .comment("Отображать редких покемонов (Шайни, Легендарные, Боссы), если строка поиска пуста.",
                      "Show rare pokemon (Shiny, Legendary, Boss) when search filter is empty.")
             .define("pokemonShowRareWithoutFilter", true);
+
+        pokemonRadarTrackDitto = builder
+            .comment("Отслеживать и выделять Дитто (включая замаскированных) на покерадаре.",
+                     "Track and highlight Dittos (including disguised ones) on the PokéRadar.")
+            .define("pokemonRadarTrackDitto", true);
 
         builder.pop();
 

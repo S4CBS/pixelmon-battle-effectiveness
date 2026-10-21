@@ -19,12 +19,18 @@ public class PokemonRadarEntry implements Comparable<PokemonRadarEntry> {
     public final boolean isRaid;
     public final int raidStars;
     public final boolean isTeraRaid;
+    public final boolean isDitto;
+    public final boolean isDittoDisguise;
 
     public PokemonRadarEntry(Vec3 pos, String name, int level, boolean isShiny, boolean isLegendary, boolean isBoss, String bossTierName, int bossColor, boolean isMatchedFilter, ResourceLocation sprite, double distance, double relativeAngle) {
-        this(pos, name, level, isShiny, isLegendary, isBoss, bossTierName, bossColor, isMatchedFilter, sprite, distance, relativeAngle, false, 0, false);
+        this(pos, name, level, isShiny, isLegendary, isBoss, bossTierName, bossColor, isMatchedFilter, sprite, distance, relativeAngle, false, 0, false, false, false);
     }
 
     public PokemonRadarEntry(Vec3 pos, String name, int level, boolean isShiny, boolean isLegendary, boolean isBoss, String bossTierName, int bossColor, boolean isMatchedFilter, ResourceLocation sprite, double distance, double relativeAngle, boolean isRaid, int raidStars, boolean isTeraRaid) {
+        this(pos, name, level, isShiny, isLegendary, isBoss, bossTierName, bossColor, isMatchedFilter, sprite, distance, relativeAngle, isRaid, raidStars, isTeraRaid, false, false);
+    }
+
+    public PokemonRadarEntry(Vec3 pos, String name, int level, boolean isShiny, boolean isLegendary, boolean isBoss, String bossTierName, int bossColor, boolean isMatchedFilter, ResourceLocation sprite, double distance, double relativeAngle, boolean isRaid, int raidStars, boolean isTeraRaid, boolean isDitto, boolean isDittoDisguise) {
         this.pos = pos;
         this.name = name;
         this.level = level;
@@ -40,6 +46,8 @@ public class PokemonRadarEntry implements Comparable<PokemonRadarEntry> {
         this.isRaid = isRaid;
         this.raidStars = raidStars;
         this.isTeraRaid = isTeraRaid;
+        this.isDitto = isDitto;
+        this.isDittoDisguise = isDittoDisguise;
     }
 
     public int getHudColor() {
@@ -51,6 +59,8 @@ public class PokemonRadarEntry implements Comparable<PokemonRadarEntry> {
             if (isTeraRaid) return 0xFF55FFFF; // Cyan
             return 0xFFFF5555; // Red
         }
+        if (isDitto) return 0xFFFF55FF;         // Bright Magenta for guaranteed Ditto
+        if (isDittoDisguise) return 0xFFDA70D6; // Orchid / Purple for potential Ditto disguise
         if (isShiny) return 0xFFFFD700;      // Gold
         if (isLegendary) return 0xFFFF55FF;  // Light Purple / Magenta
         if (isBoss) {
@@ -74,6 +84,8 @@ public class PokemonRadarEntry implements Comparable<PokemonRadarEntry> {
             }
             return isTeraRaid ? "§b[💎 Рейд " + starStr + "]" : "§c[⚔ Рейд " + starStr + "]";
         }
+        if (isDitto) return "§d[🎭 ДИТТО!]";
+        if (isDittoDisguise) return "§5[🎭 Дитто?]";
         if (isShiny) return "§6[✨]";
         if (isLegendary) return "§d[★]";
         if (isBoss) {
@@ -90,13 +102,16 @@ public class PokemonRadarEntry implements Comparable<PokemonRadarEntry> {
         if (this.isMatchedFilter != other.isMatchedFilter) {
             return this.isMatchedFilter ? -1 : 1;
         }
+        if (this.isDitto != other.isDitto) {
+            return this.isDitto ? -1 : 1;
+        }
         boolean thisLegendaryRaid = this.isRaid && this.isLegendary;
         boolean otherLegendaryRaid = other.isRaid && other.isLegendary;
         if (thisLegendaryRaid != otherLegendaryRaid) {
             return thisLegendaryRaid ? -1 : 1;
         }
-        boolean thisSpecial = this.isShiny || this.isLegendary || this.isBoss || this.isRaid;
-        boolean otherSpecial = other.isShiny || other.isLegendary || other.isBoss || other.isRaid;
+        boolean thisSpecial = this.isShiny || this.isLegendary || this.isBoss || this.isRaid || this.isDitto || this.isDittoDisguise;
+        boolean otherSpecial = other.isShiny || other.isLegendary || other.isBoss || other.isRaid || other.isDitto || other.isDittoDisguise;
         if (thisSpecial != otherSpecial) {
             return thisSpecial ? -1 : 1;
         }
