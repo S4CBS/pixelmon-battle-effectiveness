@@ -46,6 +46,11 @@ public class EffectivenessConfig {
     public final ModConfigSpec.BooleanValue autoFarmDropNonMint;
     public final ModConfigSpec.BooleanValue autoFarmHudEnabled;
     public final ModConfigSpec.ConfigValue<String> autoFarmKeepItemFilter;
+    public final ModConfigSpec.ConfigValue<String> autoFarmBattleMode;
+    public final ModConfigSpec.ConfigValue<String> autoFarmEndBattleCommand;
+    public final ModConfigSpec.BooleanValue autoFarmAutoHeal;
+    public final ModConfigSpec.ConfigValue<String> autoFarmHealCommand;
+    public final ModConfigSpec.IntValue autoFarmHealThreshold;
 
     public EffectivenessConfig(ModConfigSpec.Builder builder) {
         builder.push("general");
@@ -233,6 +238,31 @@ public class EffectivenessConfig {
             .comment("Список ID предметов, которые нужно сохранять при автофарме через Forage (через запятую). Поддерживает маски (*mint*).",
                      "Comma-separated list of item IDs to keep during auto-farm Forage. Supports wildcards (*mint*).")
             .define("keepItemFilter", "pixelmon:mint_seeds, pixelmon:*mint*");
+
+        autoFarmBattleMode = builder
+            .comment("Режим действий при начале битвы в автофарме: FLEE, ATTACK, COMMAND, FLEE_OR_ATTACK.",
+                     "Battle action mode during auto-farm: FLEE, ATTACK, COMMAND, FLEE_OR_ATTACK.")
+            .define("battleMode", "FLEE_OR_ATTACK");
+
+        autoFarmEndBattleCommand = builder
+            .comment("Команда для быстрого завершения битвы в режиме COMMAND.",
+                     "Command to end battle in COMMAND mode.")
+            .define("endBattleCommand", "/endbattle");
+
+        autoFarmAutoHeal = builder
+            .comment("Автоматически использовать команду лечения покемонов при ранении или после битвы.",
+                     "Automatically execute heal command when pokemon are injured or after battle.")
+            .define("autoHeal", true);
+
+        autoFarmHealCommand = builder
+            .comment("Команда для лечения покемонов (по умолчанию /pokeheal).",
+                     "Command to heal pokemon (default /pokeheal).")
+            .define("healCommand", "/pokeheal");
+
+        autoFarmHealThreshold = builder
+            .comment("Порог HP покемона (в %), ниже которого вызывается лечение команды.",
+                     "Pokemon HP threshold (in %) below which auto-heal is triggered.")
+            .defineInRange("healThreshold", 60, 1, 100);
 
         builder.pop();
     }

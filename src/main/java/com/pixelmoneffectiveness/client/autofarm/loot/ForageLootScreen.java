@@ -16,7 +16,7 @@ import java.util.*;
 public class ForageLootScreen extends Screen {
 
     private static final int DIALOG_WIDTH = 380;
-    private static final int DIALOG_HEIGHT = 282;
+    private static final int DIALOG_HEIGHT = 306;
 
     private final Screen parentScreen;
     private EditBox searchBox;
@@ -94,8 +94,53 @@ public class ForageLootScreen extends Screen {
             this.addRenderableWidget(catBtn);
         }
 
+        // Battle & Auto-Heal Control Buttons
+        Button battleModeBtn = Button.builder(
+            Component.literal(getBattleModeButtonLabel(isRu)),
+            btn -> {
+                if (EffectivenessConfig.CONFIG != null) {
+                    String cur = EffectivenessConfig.CONFIG.autoFarmBattleMode.get().toUpperCase(Locale.ROOT);
+                    String next = switch (cur) {
+                        case "FLEE_OR_ATTACK" -> "FLEE";
+                        case "FLEE" -> "ATTACK";
+                        case "ATTACK" -> "COMMAND";
+                        default -> "FLEE_OR_ATTACK";
+                    };
+                    EffectivenessConfig.CONFIG.autoFarmBattleMode.set(next);
+                    EffectivenessConfig.SPEC.save();
+                    btn.setMessage(Component.literal(getBattleModeButtonLabel(isRu)));
+                    playClickSound();
+                }
+            }
+        )
+        .bounds(left + 10, top + 252, 175, 20)
+        .tooltip(Tooltip.create(Component.literal(isRu
+            ? "Действия при нападении дикого покемона:\n• Побег/Атака — сначала сбежать, иначе автоатака\n• Сбежать — всегда выходить через Flee\n• Автоатака — атаковать до победы (XP/дроп)\n• /endbattle — серверная команда"
+            : "Action when wild pokemon attacks:\n• Flee/Attack — flee first, attack if trapped\n• Flee — always flee\n• Attack — fight until victory (XP/drop)\n• /endbattle — server command")))
+        .build();
+        this.addRenderableWidget(battleModeBtn);
+
+        Button autoHealBtn = Button.builder(
+            Component.literal(getAutoHealButtonLabel(isRu)),
+            btn -> {
+                if (EffectivenessConfig.CONFIG != null) {
+                    boolean next = !EffectivenessConfig.CONFIG.autoFarmAutoHeal.get();
+                    EffectivenessConfig.CONFIG.autoFarmAutoHeal.set(next);
+                    EffectivenessConfig.SPEC.save();
+                    btn.setMessage(Component.literal(getAutoHealButtonLabel(isRu)));
+                    playClickSound();
+                }
+            }
+        )
+        .bounds(left + 195, top + 252, 175, 20)
+        .tooltip(Tooltip.create(Component.literal(isRu
+            ? "Автолечение команды покемонов:\nПри падении HP ниже порога или после битвы выполняет команду /pokeheal."
+            : "Auto-heal pokemon party:\nExecutes /pokeheal when HP is low or after battle.")))
+        .build();
+        this.addRenderableWidget(autoHealBtn);
+
         // Bottom Action Bar Buttons
-        int bottomY = top + DIALOG_HEIGHT - 28;
+        int bottomY = top + DIALOG_HEIGHT - 26;
 
         Button clearAllBtn = Button.builder(
             Component.literal(isRu ? "✕ Сброс" : "✕ Clear"),
@@ -158,6 +203,26 @@ public class ForageLootScreen extends Screen {
         this.addRenderableWidget(applyBtn);
 
         updateDisplayList();
+    }
+
+    private String getBattleModeButtonLabel(boolean isRu) {
+        String mode = (EffectivenessConfig.CONFIG != null) ? EffectivenessConfig.CONFIG.autoFarmBattleMode.get() : "FLEE_OR_ATTACK";
+        return switch (mode.toUpperCase(Locale.ROOT)) {
+            case "FLEE" -> isRu ? "⚔ Битва: §aСбежать" : "⚔ Battle: §aFlee";
+            case "ATTACK" -> isRu ? "⚔ Битва: §cАвтоатака" : "⚔ Battle: §cAttack";
+            case "COMMAND" -> isRu ? "⚔ Битва: §b/endbattle" : "⚔ Battle: §b/endbattle";
+            default -> isRu ? "⚔ Битва: §eПобег/Атака" : "⚔ Battle: §eFlee/Attack";
+        };
+    }
+
+    private String getAutoHealButtonLabel(boolean isRu) {
+        boolean heal = (EffectivenessConfig.CONFIG == null) || EffectivenessConfig.CONFIG.autoFarmAutoHeal.get();
+        String cmd = (EffectivenessConfig.CONFIG != null) ? EffectivenessConfig.CONFIG.autoFarmHealCommand.get() : "/pokeheal";
+        if (heal) {
+            return isRu ? ("❤ Лечение: §aВКЛ (" + cmd + ")") : ("❤ Heal: §aON (" + cmd + ")");
+        } else {
+            return isRu ? "❤ Лечение: §7ВЫКЛ" : "❤ Heal: §7OFF";
+        }
     }
 
     private void playClickSound() {

@@ -5,9 +5,13 @@ import com.pixelmonmod.pixelmon.api.moveskills.MoveSkill;
 import com.pixelmonmod.pixelmon.api.pokemon.Pokemon;
 import com.pixelmonmod.pixelmon.api.storage.PlayerPartyStorage;
 import com.pixelmonmod.pixelmon.api.util.helpers.NetworkHelper;
+import com.pixelmonmod.pixelmon.client.ClientProxy;
+import com.pixelmonmod.pixelmon.client.gui.battles.BattleScreen;
+import com.pixelmonmod.pixelmon.client.gui.battles.PixelmonClientData;
 import com.pixelmonmod.pixelmon.client.keybindings.SendPokemonKey;
 import com.pixelmonmod.pixelmon.client.listener.SendoutListener;
 import com.pixelmonmod.pixelmon.client.storage.ClientStorageManager;
+import com.pixelmonmod.pixelmon.comm.packetHandlers.battles.FleePacket;
 import com.pixelmonmod.pixelmon.comm.packetHandlers.moveskills.UseMoveSkillPacket;
 import com.pixelmonmod.pixelmon.comm.packetHandlers.storage.ServerboundSetSelectedSlotPacket;
 import com.pixelmonmod.pixelmon.entities.pixelmon.PixelmonEntity;
@@ -102,6 +106,10 @@ public class MintAutoFarmClient {
     private static long lastThrowTime = 0;
     private static int spawnWaitTicks = 0;
     private static int recallWaitTicks = 0;
+    private static boolean wasInBattle = false;
+    private static int battleTicks = 0;
+    private static int fleeAttempts = 0;
+    private static long lastHealTime = 0;
 
     // Snapshot of player inventory (slots 9 to 44) before each forage
     private static final Map<Integer, ItemStack> inventorySnapshot = new HashMap<>();
@@ -118,13 +126,19 @@ public class MintAutoFarmClient {
             targetBlockPos = null;
             spawnWaitTicks = 0;
             recallWaitTicks = 0;
+            wasInBattle = false;
+            battleTicks = 0;
+            fleeAttempts = 0;
         } else {
             state = State.FIND_BEST_BLOCK;
             stateTimer = 0;
-            statusText = "Поиск наилучшего блока...";
+            statusText = "Поиск блока...";
             lastThrowTime = 0;
             spawnWaitTicks = 0;
             recallWaitTicks = 0;
+            wasInBattle = false;
+            battleTicks = 0;
+            fleeAttempts = 0;
         }
     }
 
@@ -159,15 +173,27 @@ public class MintAutoFarmClient {
             setActive(!active);
             boolean isRu = isRussianLanguage(mc);
             String msg = active
-                ? (isRu ? "§a[Автофарм] §eВКЛЮЧЕН §7(J - выкл, K - лут). Поиск блока (Мох/Дёрн)..." : "§a[AutoFarm] §eENABLED §7(J to toggle, K for loot). Searching block (Moss/Grass)...")
+                ? (isRu ? "§a[Автофарм] §eВКЛЮЧЕН §7(J - выкл, K - лут). Поиск блока..." : "§a[AutoFarm] §eENABLED §7(J to toggle, K for loot). Searching block...")
                 : (isRu ? "§e[Автофарм] §cВЫКЛЮЧЕН." : "§e[AutoFarm] §cDISABLED.");
             mc.player.displayClientMessage(Component.literal(msg), true);
         }
 
         if (!active) return;
 
-        // If player is dead, inside a container screen (chest, etc.), or in battle -> pause
-        if (!mc.player.isAlive() || (mc.screen != null && !(mc.screen instanceof net.minecraft.client.gui.screens.ChatScreen))) {
+        if (!mc.player.isAlive()) return;
+
+        // Check if player is pulled into a battle (e.g. from wild Forage encounter)
+        boolean isBattling = ClientProxy.battleManager != null && ClientProxy.battleManager.isBattling();
+        if (isBattling) {
+            handleBattleState(mc);
+            return;
+        } else if (wasInBattle) {
+            handleBattleEnded(mc);
+            return;
+        }
+
+        // If player is inside a container screen (chest, crafting table, inventory, etc.) -> pause
+        if (mc.screen != null && !(mc.screen instanceof net.minecraft.client.gui.screens.ChatScreen)) {
             return;
         }
 
@@ -194,19 +220,19 @@ public class MintAutoFarmClient {
             return;
         }
 
-        // Biome validation according to Pixelmon forage_loot anticondition
-        biomeWarning = !isBiomeSuitableForMint(mc.level, mc.player.blockPosition());
+        // Informational check only
+        biomeWarning = isBiomeAridForMint(mc.level, mc.player.blockPosition());
 
         switch (state) {
             case FIND_BEST_BLOCK -> {
                 targetBlockPos = findBestForageBlock(mc);
                 if (targetBlockPos == null) {
-                    statusText = "§cНет подходящего блока под открытым небом!";
+                    statusText = "§cНет подходящего блока рядом!";
                     stateTimer = 20; // Recheck in 1 second
                     return;
                 }
                 BlockState bState = mc.level.getBlockState(targetBlockPos);
-                targetBlockScore = getBlockScore(bState);
+                targetBlockScore = getBlockScore(bState, targetBlockPos, mc.player.blockPosition(), mc.level);
                 targetBlockName = bState.getBlock().getName().getString();
                 statusText = "Выбран: " + targetBlockName + " (" + targetBlockScore + "★)";
                 state = State.SELECT_POKEMON;
@@ -214,6 +240,9 @@ public class MintAutoFarmClient {
             }
 
             case SELECT_POKEMON -> {
+                // If any party pokemon is injured or fainted, try auto-healing
+                tryAutoHeal(mc, false);
+
                 // Verify block is still valid or find an even better one
                 targetBlockPos = findBestForageBlock(mc);
                 if (targetBlockPos == null) {
@@ -221,7 +250,7 @@ public class MintAutoFarmClient {
                     return;
                 }
                 BlockState bState = mc.level.getBlockState(targetBlockPos);
-                targetBlockScore = getBlockScore(bState);
+                targetBlockScore = getBlockScore(bState, targetBlockPos, mc.player.blockPosition(), mc.level);
                 targetBlockName = bState.getBlock().getName().getString();
 
                 int partyCount = party.countAll();
@@ -234,13 +263,13 @@ public class MintAutoFarmClient {
 
                 // Check current slot first
                 Pokemon currentPoke = party.getSelectedPokemon();
-                if (currentPoke != null && !currentPoke.isEgg() && !currentPoke.isMoveSkillCoolingDown(forage)) {
+                if (currentPoke != null && !currentPoke.isEgg() && !currentPoke.isFainted() && !currentPoke.isMoveSkillCoolingDown(forage)) {
                     readySlot = currentSlot;
                 } else {
-                    // Search party for a ready slot
+                    // Search party for a ready, healthy slot
                     for (int i = 0; i < partyCount; i++) {
                         Pokemon p = party.get(i);
-                        if (p == null || p.isEgg()) continue;
+                        if (p == null || p.isEgg() || p.isFainted()) continue;
                         if (!p.isMoveSkillCoolingDown(forage)) {
                             readySlot = i;
                             break;
@@ -250,6 +279,23 @@ public class MintAutoFarmClient {
                                 minCooldown = cd;
                             }
                         }
+                    }
+                }
+
+                if (readySlot == -1) {
+                    boolean allFainted = true;
+                    for (int i = 0; i < partyCount; i++) {
+                        Pokemon p = party.get(i);
+                        if (p != null && !p.isEgg() && !p.isFainted()) {
+                            allFainted = false;
+                            break;
+                        }
+                    }
+                    if (allFainted) {
+                        statusText = "§cВсе покемоны без сознания! Нужен /pokeheal";
+                        tryAutoHeal(mc, true);
+                        stateTimer = 30;
+                        return;
                     }
                 }
 
@@ -679,53 +725,60 @@ public class MintAutoFarmClient {
      * 20: Dirt / Coarse Dirt.
      * 10: Any other soil/land block from tags.
      */
-    public static int getBlockScore(BlockState state) {
-        Block b = state.getBlock();
-        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(b);
-        if (id == null) return -1;
-        String path = id.getPath().toLowerCase(Locale.ROOT);
-
-        // 1. Moss blocks (Highest priority)
-        if (b == Blocks.MOSS_BLOCK || path.equals("moss_block")) {
-            return 100;
-        }
-        if (b == Blocks.MOSS_CARPET || path.contains("moss")) {
-            return 90;
-        }
-
-        // 2. Podzol / Mycelium (Never turn into plain dirt)
-        if (b == Blocks.PODZOL || b == Blocks.MYCELIUM) {
-            return 70;
-        }
-
-        // 3. Grass blocks
-        if (b == Blocks.GRASS_BLOCK || path.contains("grass_block")) {
-            return 50;
-        }
-
-        // 4. Mud / Rooted Dirt
-        if (b == Blocks.MUD || b == Blocks.ROOTED_DIRT || path.contains("mud") || path.contains("rooted")) {
-            return 30;
-        }
-
-        // 5. Dirt / Coarse Dirt
-        if (b == Blocks.DIRT || b == Blocks.COARSE_DIRT || path.contains("dirt")) {
-            return 20;
-        }
-
-        // 6. Generic soil / land
-        if (state.is(BlockTags.DIRT)) {
-            return 15;
-        }
-
-        return -1;
+    public static boolean isFarmingMints() {
+        if (EffectivenessConfig.CONFIG == null) return true;
+        String filter = EffectivenessConfig.CONFIG.autoFarmKeepItemFilter.get().toLowerCase(Locale.ROOT);
+        return filter.contains("mint");
     }
 
-    /**
-     * Scans for the best possible block in a 7x7x4 area around the player.
-     * A higher priority block (e.g. Moss Block = 100) ALWAYS beats a lower priority block
-     * (e.g. Grass Block = 50), even if the moss block is a couple blocks away!
-     */
+    public static int getBlockScore(BlockState state, BlockPos pos, BlockPos playerPos, ClientLevel level) {
+        Block b = state.getBlock();
+        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(b);
+        if (id == null) return 20;
+        String path = id.getPath().toLowerCase(Locale.ROOT);
+
+        int score = 30;
+        boolean mintFarming = isFarmingMints();
+
+        if (mintFarming) {
+            // Moss blocks (Highest priority for mint)
+            if (b == Blocks.MOSS_BLOCK || path.equals("moss_block")) {
+                score = 100;
+            } else if (b == Blocks.MOSS_CARPET || path.contains("moss")) {
+                score = 90;
+            } else if (b == Blocks.PODZOL || b == Blocks.MYCELIUM) {
+                score = 75;
+            } else if (b == Blocks.GRASS_BLOCK || path.contains("grass_block")) {
+                score = 60;
+            } else if (b == Blocks.MUD || b == Blocks.ROOTED_DIRT || path.contains("mud") || path.contains("rooted")) {
+                score = 45;
+            } else if (b == Blocks.DIRT || b == Blocks.COARSE_DIRT || path.contains("dirt") || state.is(BlockTags.DIRT)) {
+                score = 35;
+            } else if (path.contains("sand")) {
+                score = 30;
+            } else {
+                score = 25;
+            }
+
+            // Small bonus for sky visibility when farming mints
+            if (level != null && pos != null && level.canSeeSky(pos.above())) {
+                score += 5;
+            }
+        } else {
+            // Non-mint farming (bones, stones, treasures, mc loot): all solid blocks are great!
+            score = 50;
+        }
+
+        // Strong bonus if this block is right under player's feet (dx=0, dz=0, dy=-1)
+        if (playerPos != null && pos != null) {
+            if (pos.getX() == playerPos.getX() && pos.getZ() == playerPos.getZ() && pos.getY() == playerPos.getY() - 1) {
+                score += 20;
+            }
+        }
+
+        return score;
+    }
+
     public static BlockPos findBestForageBlock(Minecraft mc) {
         if (mc.player == null || mc.level == null) return null;
         BlockPos playerPos = mc.player.blockPosition();
@@ -735,20 +788,16 @@ public class MintAutoFarmClient {
         double bestDistSq = Double.MAX_VALUE;
 
         // Check feet and immediate surrounding in radius 3
-        for (int dy = 1; dy >= -2; dy--) {
+        for (int dy = 0; dy >= -2; dy--) {
             for (int dx = -3; dx <= 3; dx++) {
                 for (int dz = -3; dz <= 3; dz++) {
                     BlockPos pos = playerPos.offset(dx, dy, dz);
                     if (!isValidForageBlock(mc.level, pos)) continue;
 
-                    int score = getBlockScore(mc.level.getBlockState(pos));
+                    int score = getBlockScore(mc.level.getBlockState(pos), pos, playerPos, mc.level);
                     if (score < 0) continue;
 
                     double distSq = pos.distSqr(playerPos);
-                    // Slight preference to feet block if scores are identical
-                    if (dx == 0 && dz == 0 && (dy == -1 || dy == 0)) {
-                        distSq -= 2.0;
-                    }
 
                     if (score > bestScore || (score == bestScore && distSq < bestDistSq)) {
                         bestScore = score;
@@ -762,36 +811,199 @@ public class MintAutoFarmClient {
     }
 
     public static boolean isValidForageBlock(ClientLevel level, BlockPos pos) {
+        if (level == null || pos == null) return false;
         BlockState state = level.getBlockState(pos);
-        if (getBlockScore(state) < 0) {
+        if (state.isAir()) return false;
+
+        // Block must be solid / support standing or foraging
+        if (!state.isSolid() && !state.blocksMotion()) {
+            return false;
+        }
+
+        // Fluid check (cannot forage on open water or lava)
+        if (!state.getFluidState().isEmpty()) {
             return false;
         }
 
         BlockPos above = pos.above();
-        // Crucial requirement for Mint Seeds from Pixelmon forage_loot: must see sky!
-        if (!level.canSeeSky(above)) {
-            return false;
-        }
+        BlockState aboveState = level.getBlockState(above);
 
         // Block above must allow entity/drop to exist (air, grass, flower, carpet, etc.)
-        BlockState aboveState = level.getBlockState(above);
         return !aboveState.isSolid() || aboveState.canBeReplaced() || aboveState.is(Blocks.MOSS_CARPET);
     }
 
-    public static boolean isBiomeSuitableForMint(ClientLevel level, BlockPos pos) {
+    public static boolean isBiomeAridForMint(ClientLevel level, BlockPos pos) {
+        if (!isFarmingMints() || level == null || pos == null) return false;
         Holder<Biome> biomeHolder = level.getBiome(pos);
         ResourceLocation biomeId = biomeHolder.unwrapKey().map(ResourceKey::location).orElse(null);
-        if (biomeId == null) return true;
+        if (biomeId == null) return false;
         String path = biomeId.getPath().toLowerCase(Locale.ROOT);
+        return path.contains("desert") || path.contains("badlands") || path.contains("mesa")
+            || path.contains("ocean") || path.contains("nether") || path.contains("the_end");
+    }
 
-        // Pixelmon forage_loot anticonditions: arid, oceanic, end, hellish
-        if (path.contains("desert") || path.contains("badlands") || path.contains("mesa")
-            || path.contains("ocean") || path.contains("beach")
-            || path.contains("nether") || path.contains("crimson") || path.contains("warped") || path.contains("soul") || path.contains("basalt")
-            || path.contains("the_end") || path.contains("end_")) {
-            return false;
+    private static void handleBattleState(Minecraft mc) {
+        if (!wasInBattle) {
+            wasInBattle = true;
+            battleTicks = 0;
+            fleeAttempts = 0;
+            sendChat(mc, "§e[Автофарм] §cВнимание: началась битва с диким покемоном!");
         }
-        return true;
+
+        battleTicks++;
+        // Execute action every 15 ticks (0.75s) to allow animations and avoid packet flooding
+        if (battleTicks % 15 != 0) {
+            return;
+        }
+
+        String mode = (EffectivenessConfig.CONFIG != null)
+            ? EffectivenessConfig.CONFIG.autoFarmBattleMode.get().toUpperCase(Locale.ROOT)
+            : "FLEE_OR_ATTACK";
+
+        switch (mode) {
+            case "COMMAND" -> {
+                String cmd = EffectivenessConfig.CONFIG.autoFarmEndBattleCommand.get();
+                statusText = "§eЗавершение битвы (" + cmd + ")...";
+                executeCommand(mc, cmd);
+            }
+            case "FLEE" -> {
+                statusText = "§eПобег из битвы (Flee)...";
+                fleeAttempts++;
+                attemptFlee(mc);
+            }
+            case "FLEE_OR_ATTACK" -> {
+                fleeAttempts++;
+                if (fleeAttempts <= 2) {
+                    statusText = "§eПопытка побега (" + fleeAttempts + "/2)...";
+                    attemptFlee(mc);
+                } else {
+                    statusText = "§cПобег не удался, автоатака...";
+                    attackInBattle(mc);
+                }
+            }
+            case "ATTACK" -> {
+                statusText = "§cАвтобитва (выбор атаки)...";
+                attackInBattle(mc);
+            }
+            default -> {
+                statusText = "§eПобег из битвы...";
+                attemptFlee(mc);
+            }
+        }
+    }
+
+    private static void attemptFlee(Minecraft mc) {
+        if (mc.screen instanceof BattleScreen bs) {
+            try {
+                bs.chooseToFleeOrForfeitUsingKeyPress();
+            } catch (Throwable ignored) {}
+        } else {
+            try {
+                PixelmonClientData poke = (ClientProxy.battleManager != null) ? ClientProxy.battleManager.getCurrentPokemon() : null;
+                UUID uuid = (poke != null) ? poke.pokemonUUID : null;
+                NetworkHelper.sendToServer(new FleePacket(uuid));
+            } catch (Throwable ignored) {}
+        }
+    }
+
+    private static void attackInBattle(Minecraft mc) {
+        if (mc.screen instanceof BattleScreen bs) {
+            // Try attack slots 0, 1, 2, 3
+            boolean chosen = false;
+            for (int i = 0; i < 4; i++) {
+                try {
+                    if (bs.chooseAttackUsingKeyPress(i)) {
+                        chosen = true;
+                        break;
+                    }
+                } catch (Throwable ignored) {}
+            }
+            if (!chosen && ClientProxy.battleManager != null) {
+                try {
+                    ClientProxy.battleManager.afkSelectMove();
+                } catch (Throwable ignored) {}
+            }
+        } else if (ClientProxy.battleManager != null) {
+            try {
+                ClientProxy.battleManager.afkSelectMove();
+            } catch (Throwable ignored) {}
+        }
+    }
+
+    private static void handleBattleEnded(Minecraft mc) {
+        wasInBattle = false;
+        battleTicks = 0;
+        fleeAttempts = 0;
+        statusText = "Битва окончена. Продолжение автофарма...";
+        sendChat(mc, "§a[Автофарм] §eДикая битва завершена!");
+
+        if (mc.screen instanceof BattleScreen) {
+            try {
+                BattleScreen.restoreSettingsAndCloseStatic(ClientProxy.battleManager);
+            } catch (Throwable ignored) {}
+            mc.setScreen(null);
+        }
+
+        // Auto-heal party if enabled
+        if (EffectivenessConfig.CONFIG != null && EffectivenessConfig.CONFIG.autoFarmAutoHeal.get()) {
+            tryAutoHeal(mc, true);
+        }
+
+        state = State.FIND_BEST_BLOCK;
+        stateTimer = 15;
+    }
+
+    public static void tryAutoHeal(Minecraft mc, boolean force) {
+        if (mc.player == null || mc.player.connection == null) return;
+        if (EffectivenessConfig.CONFIG == null || !EffectivenessConfig.CONFIG.autoFarmAutoHeal.get()) return;
+
+        long now = System.currentTimeMillis();
+        // 5 seconds cooldown between /pokeheal to prevent server flood/spam
+        if (now - lastHealTime < 5000) {
+            return;
+        }
+
+        PlayerPartyStorage party = ClientStorageManager.party();
+        if (party == null) return;
+
+        boolean needsHeal = force;
+        int threshold = EffectivenessConfig.CONFIG.autoFarmHealThreshold.get();
+
+        if (!needsHeal) {
+            for (int i = 0; i < party.countAll(); i++) {
+                Pokemon p = party.get(i);
+                if (p != null) {
+                    if (p.isFainted() || p.getHealthPercentage() <= threshold) {
+                        needsHeal = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (needsHeal) {
+            String cmd = EffectivenessConfig.CONFIG.autoFarmHealCommand.get();
+            executeCommand(mc, cmd);
+            lastHealTime = now;
+            sendChat(mc, "§a[Автофарм] §bКоманда лечения: §f" + cmd);
+        }
+    }
+
+    public static void executeCommand(Minecraft mc, String command) {
+        if (mc.player == null || mc.player.connection == null || command == null || command.trim().isEmpty()) {
+            return;
+        }
+        String clean = command.trim();
+        if (clean.startsWith("/")) {
+            clean = clean.substring(1);
+        }
+        try {
+            mc.player.connection.sendCommand(clean);
+        } catch (Throwable t) {
+            try {
+                mc.player.connection.sendChat("/" + clean);
+            } catch (Throwable ignored) {}
+        }
     }
 
     private static void sendChat(Minecraft mc, String message) {
@@ -822,7 +1034,7 @@ public class MintAutoFarmClient {
         poseStack.mulPose(camera.rotation());
         poseStack.scale(0.025f, -0.025f, 0.025f);
 
-        String tag = (targetBlockScore >= 90)
+        String tag = (targetBlockScore >= 50)
             ? "§a☘ [" + targetBlockName + "] ★" + targetBlockScore
             : "§e☘ [" + targetBlockName + "] ★" + targetBlockScore;
 
@@ -860,23 +1072,23 @@ public class MintAutoFarmClient {
 
         int panelX = 10;
         int panelY = 85;
-        int panelW = 224;
-        int panelH = biomeWarning ? 88 : 78;
+        int panelW = 230;
+        int panelH = biomeWarning ? 100 : 90;
 
         // Semi-transparent background with emerald/gold border
-        int borderColor = (targetBlockScore >= 90) ? 0xFF2ECC71 : 0xFFF1C40F;
+        int borderColor = (targetBlockScore >= 50) ? 0xFF2ECC71 : 0xFFF1C40F;
         graphics.fill(panelX, panelY, panelX + panelW, panelY + panelH, 0xAA111A1E);
         graphics.fill(panelX, panelY, panelX + panelW, panelY + 1, borderColor);
         graphics.fill(panelX, panelY + panelH - 1, panelX + panelW, panelY + panelH, borderColor);
         graphics.fill(panelX, panelY, panelX + 1, panelY + panelH, borderColor);
         graphics.fill(panelX + panelW - 1, panelY, panelX + panelW, panelY + panelH, borderColor);
 
-        String title = isRu ? "§a☘ Автофарм Мяты §7(J - стоп, K - лут)" : "§a☘ Mint Auto-Farm §7(J stop, K loot)";
+        String title = isRu ? "§a☘ Автофарм Forage §7(J - стоп, K - лут)" : "§a☘ Forage Auto-Farm §7(J stop, K loot)";
         graphics.drawString(font, title, panelX + 6, panelY + 5, 0xFFFFFFFF, true);
 
         String targetStr = String.format(Locale.ROOT, "§7%s: %s §f%s §7(%d★)",
             (isRu ? "Цель" : "Target"),
-            (targetBlockScore >= 90 ? "§a" : "§e"),
+            (targetBlockScore >= 50 ? "§a" : "§e"),
             targetBlockName,
             targetBlockScore
         );
@@ -900,12 +1112,27 @@ public class MintAutoFarmClient {
         );
         graphics.drawString(font, stats2, panelX + 6, panelY + 53, 0xFFAAAAAA, true);
 
-        String hint = isRu ? "§8[K / Shift+J] — Настройка фильтра лута" : "§8[K / Shift+J] — Configure loot filter";
-        graphics.drawString(font, hint, panelX + 6, panelY + 65, 0xFF888888, true);
+        // Battle & Heal status line
+        String bMode = (EffectivenessConfig.CONFIG != null) ? EffectivenessConfig.CONFIG.autoFarmBattleMode.get() : "FLEE_OR_ATTACK";
+        boolean healOn = (EffectivenessConfig.CONFIG == null) || EffectivenessConfig.CONFIG.autoFarmAutoHeal.get();
+        String bModeLabel = switch (bMode.toUpperCase(Locale.ROOT)) {
+            case "FLEE" -> isRu ? "Побег" : "Flee";
+            case "ATTACK" -> isRu ? "Атака" : "Attack";
+            case "COMMAND" -> "/endbattle";
+            default -> isRu ? "Побег/Атака" : "Flee/Atk";
+        };
+        String battleLine = String.format(Locale.ROOT, "§7%s: §e%s §7| §7Heal: %s",
+            (isRu ? "Битва" : "Battle"), bModeLabel,
+            (healOn ? "§aВКЛ" : "§7ВЫКЛ")
+        );
+        graphics.drawString(font, battleLine, panelX + 6, panelY + 65, 0xFFFFFFFF, true);
+
+        String hint = isRu ? "§8[K / Shift+J] — Настройка лута и битв" : "§8[K / Shift+J] — Configure loot & battle";
+        graphics.drawString(font, hint, panelX + 6, panelY + 77, 0xFF888888, true);
 
         if (biomeWarning) {
-            String bioWarn = isRu ? "§c⚠ Биом запрещен для семян мяты!" : "§c⚠ Biome blocked for mint seeds!";
-            graphics.drawString(font, bioWarn, panelX + 6, panelY + 77, 0xFFFF5555, true);
+            String bioWarn = isRu ? "§7(Инфо: в пустыне семена мяты редки)" : "§7(Mint seeds are rare in desert)";
+            graphics.drawString(font, bioWarn, panelX + 6, panelY + 89, 0xFFAAAAAA, true);
         }
     }
 
