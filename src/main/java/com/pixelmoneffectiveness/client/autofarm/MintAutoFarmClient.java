@@ -7,6 +7,7 @@ import com.pixelmonmod.pixelmon.api.storage.PlayerPartyStorage;
 import com.pixelmonmod.pixelmon.api.util.helpers.NetworkHelper;
 import com.pixelmonmod.pixelmon.api.battles.AttackCategory;
 import com.pixelmonmod.pixelmon.api.battles.BattleMode;
+import com.pixelmonmod.pixelmon.api.battles.action.type.AttackBattleAction;
 import com.pixelmonmod.pixelmon.api.battles.action.type.SwitchBattleAction;
 import com.pixelmonmod.pixelmon.api.context.ContextKeys;
 import com.pixelmonmod.pixelmon.api.pokemon.stats.Moveset;
@@ -121,6 +122,7 @@ public class MintAutoFarmClient {
     private static int battleTicks = 0;
     private static int fleeAttempts = 0;
     private static int switchCooldownTicks = 0;
+    private static int battleActionCooldownTicks = 0;
     private static long lastHealTime = 0;
 
     // Snapshot of player inventory (slots 9 to 44) before each forage
@@ -142,6 +144,7 @@ public class MintAutoFarmClient {
             battleTicks = 0;
             fleeAttempts = 0;
             switchCooldownTicks = 0;
+            battleActionCooldownTicks = 0;
         } else {
             state = State.FIND_BEST_BLOCK;
             stateTimer = 0;
@@ -153,6 +156,7 @@ public class MintAutoFarmClient {
             battleTicks = 0;
             fleeAttempts = 0;
             switchCooldownTicks = 0;
+            battleActionCooldownTicks = 0;
         }
     }
 
@@ -196,6 +200,9 @@ public class MintAutoFarmClient {
 
         if (switchCooldownTicks > 0) {
             switchCooldownTicks--;
+        }
+        if (battleActionCooldownTicks > 0) {
+            battleActionCooldownTicks--;
         }
 
         if (!mc.player.isAlive()) return;
@@ -861,16 +868,28 @@ public class MintAutoFarmClient {
     }
 
     private static void handleBattleState(Minecraft mc) {
+        ClientBattleManager bm = ClientProxy.battleManager;
+        if (bm == null || !bm.isBattling()) return;
+
         if (!wasInBattle) {
             wasInBattle = true;
             battleTicks = 0;
             fleeAttempts = 0;
+            switchCooldownTicks = 0;
+            battleActionCooldownTicks = 20; // 1s grace period on start
             sendChat(mc, "§e[Автофарм] §cВнимание: началась битва с диким покемоном!");
+            return;
         }
 
         battleTicks++;
-        // Execute action every 15 ticks (0.75s) to allow animations and avoid packet flooding
-        if (battleTicks % 15 != 0) {
+
+        // If client is already waiting for the server to process turn / play animation
+        if (bm.getMode() == BattleMode.WAITING) {
+            statusText = "§eОжидание хода битвы...";
+            return;
+        }
+
+        if (battleActionCooldownTicks > 0) {
             return;
         }
 
@@ -883,17 +902,20 @@ public class MintAutoFarmClient {
                 String cmd = EffectivenessConfig.CONFIG.autoFarmEndBattleCommand.get();
                 statusText = "§eЗавершение битвы (" + cmd + ")...";
                 executeCommand(mc, cmd);
+                battleActionCooldownTicks = 40;
             }
             case "FLEE" -> {
                 statusText = "§eПобег из битвы (Flee)...";
                 fleeAttempts++;
                 attemptFlee(mc);
+                battleActionCooldownTicks = 25;
             }
             case "FLEE_OR_ATTACK" -> {
                 fleeAttempts++;
                 if (fleeAttempts <= 2) {
                     statusText = "§eПопытка побега (" + fleeAttempts + "/2)...";
                     attemptFlee(mc);
+                    battleActionCooldownTicks = 25;
                 } else {
                     statusText = "§cПобег не удался, автоатака...";
                     attackInBattle(mc);
@@ -906,6 +928,7 @@ public class MintAutoFarmClient {
             default -> {
                 statusText = "§eПобег из битвы...";
                 attemptFlee(mc);
+                battleActionCooldownTicks = 25;
             }
         }
     }
@@ -1069,7 +1092,8 @@ public class MintAutoFarmClient {
                     + " §7(лучшая атака: §f" + atkName + " §a" + String.format(Locale.ROOT, "%.1f★", bestSwitchScore) + "§7)");
                 statusText = "Смена на " + bestSwitch.getDisplayName().getString();
                 switchPokemonInBattle(bm, bestSwitch.getUUID(), currentUUID, false);
-                switchCooldownTicks = 30; // Wait 1.5s for switch to complete
+                switchCooldownTicks = 35;
+                battleActionCooldownTicks = 35;
                 return;
             }
         }
@@ -1082,30 +1106,86 @@ public class MintAutoFarmClient {
                 statusText = "Атака: " + atkName;
             }
 
-            if (mc.screen instanceof BattleScreen bs) {
-                try {
-                    bs.selectScreenImmediate(BattleMode.CHOOSE_ATTACK);
-                } catch (Throwable ignored) {}
-
-                boolean chosen = bs.chooseAttackUsingKeyPress(bestMoveIndex);
-                if (!chosen) {
-                    try {
-                        bm.selectedAttack = bestMoveIndex;
-                        bm.afkSelectMove();
-                    } catch (Throwable ignored) {}
-                }
-            } else {
-                try {
-                    bm.selectedAttack = bestMoveIndex;
-                    bm.afkSelectMove();
-                } catch (Throwable ignored) {}
+            UUID currentUUID = (activeOur != null) ? activeOur.pokemonUUID : null;
+            if (currentUUID == null && party != null && party.get(0) != null) {
+                currentUUID = party.get(0).getUUID();
             }
+
+            executeAttackInBattle(bm, activeOur, currentUUID, bestMoveIndex, bestAttack);
+            battleActionCooldownTicks = 35;
         } else {
             // Absolute fallback: afk select move or struggle
             try {
                 bm.afkSelectMove();
+                battleActionCooldownTicks = 35;
             } catch (Throwable ignored) {}
         }
+    }
+
+    public static void executeAttackInBattle(ClientBattleManager bm, PixelmonClientData activeOur, UUID pokemonUUID, int moveIndex, Attack attack) {
+        if (bm == null || pokemonUUID == null) return;
+
+        // Ensure gimmick flags are completely disabled (never force dynamax, mega, or terastal)
+        bm.dynamaxing = false;
+        bm.megaEvolving = false;
+        bm.terastallizing = false;
+
+        // Build / ensure targeting matrix: [0] = our side, [1] = enemy side
+        boolean[][] targeting = bm.targetted;
+        if (targeting == null || targeting.length < 2 || targeting[1] == null || targeting[1].length == 0) {
+            targeting = new boolean[][] {
+                new boolean[] { false },
+                new boolean[] { true }
+            };
+            bm.targetted = targeting;
+        } else {
+            if (targeting[0] != null) {
+                for (int i = 0; i < targeting[0].length; i++) targeting[0][i] = false;
+            }
+            if (targeting[1] != null && targeting[1].length > 0) {
+                for (int i = 0; i < targeting[1].length; i++) targeting[1][i] = false;
+                int targetSlot = Math.min(Math.max(0, bm.currentPokemon), targeting[1].length - 1);
+                targeting[1][targetSlot] = true;
+            }
+        }
+
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.screen instanceof BattleScreen bs && activeOur != null && attack != null) {
+            try {
+                bs.setTargeting(activeOur, attack, -1, -1);
+            } catch (Throwable ignored) {}
+        }
+
+        bm.selectedAttack = moveIndex;
+
+        AttackBattleAction action = new AttackBattleAction(
+            pokemonUUID,
+            bm.targetted != null ? bm.targetted : targeting,
+            moveIndex,
+            false,
+            false,
+            false
+        );
+        BattleActionPacket packet = new BattleActionPacket(bm.battleControllerIndex, action);
+
+        try {
+            if (bm.selectedActions == null) {
+                bm.selectedActions = new java.util.ArrayList<>();
+            }
+            bm.selectedActions.add(packet);
+            bm.selectedMove();
+        } catch (Throwable ignored) {}
+
+        try {
+            NetworkHelper.sendToServer(packet);
+        } catch (Throwable ignored) {}
+
+        try {
+            bm.setMode(BattleMode.WAITING);
+            if (mc.screen instanceof BattleScreen bs) {
+                bs.setMode(BattleMode.WAITING);
+            }
+        } catch (Throwable ignored) {}
     }
 
     public static void switchPokemonInBattle(ClientBattleManager bm, UUID newPokemonUUID, UUID currentPokemonUUID, boolean instant) {
@@ -1132,6 +1212,14 @@ public class MintAutoFarmClient {
                 ));
             } catch (Throwable ignored) {}
         }
+
+        try {
+            bm.setMode(BattleMode.WAITING);
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.screen instanceof BattleScreen bs) {
+                bs.setMode(BattleMode.WAITING);
+            }
+        } catch (Throwable ignored) {}
     }
 
     public static String getAttackDisplayName(Attack attack) {
@@ -1150,6 +1238,7 @@ public class MintAutoFarmClient {
         battleTicks = 0;
         fleeAttempts = 0;
         switchCooldownTicks = 0;
+        battleActionCooldownTicks = 0;
         statusText = "Битва окончена. Продолжение автофарма...";
         sendChat(mc, "§a[Автофарм] §eДикая битва завершена!");
 
