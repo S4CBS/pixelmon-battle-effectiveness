@@ -5,14 +5,24 @@ import com.pixelmonmod.pixelmon.api.moveskills.MoveSkill;
 import com.pixelmonmod.pixelmon.api.pokemon.Pokemon;
 import com.pixelmonmod.pixelmon.api.storage.PlayerPartyStorage;
 import com.pixelmonmod.pixelmon.api.util.helpers.NetworkHelper;
+import com.pixelmonmod.pixelmon.api.battles.AttackCategory;
+import com.pixelmonmod.pixelmon.api.battles.BattleMode;
+import com.pixelmonmod.pixelmon.api.battles.action.type.SwitchBattleAction;
+import com.pixelmonmod.pixelmon.api.context.ContextKeys;
+import com.pixelmonmod.pixelmon.api.pokemon.stats.Moveset;
+import com.pixelmonmod.pixelmon.api.pokemon.type.Type;
+import com.pixelmonmod.pixelmon.battles.attacks.Attack;
 import com.pixelmonmod.pixelmon.client.ClientProxy;
 import com.pixelmonmod.pixelmon.client.gui.battles.BattleScreen;
+import com.pixelmonmod.pixelmon.client.gui.battles.ClientBattleManager;
 import com.pixelmonmod.pixelmon.client.gui.battles.PixelmonClientData;
 import com.pixelmonmod.pixelmon.client.keybindings.SendPokemonKey;
 import com.pixelmonmod.pixelmon.client.listener.SendoutListener;
 import com.pixelmonmod.pixelmon.client.storage.ClientStorageManager;
+import com.pixelmonmod.pixelmon.comm.packetHandlers.battles.BattleActionPacket;
 import com.pixelmonmod.pixelmon.comm.packetHandlers.battles.FleePacket;
 import com.pixelmonmod.pixelmon.comm.packetHandlers.moveskills.UseMoveSkillPacket;
+import com.pixelmoneffectiveness.util.PixelmonEffectivenessHelper;
 import com.pixelmonmod.pixelmon.comm.packetHandlers.storage.ServerboundSetSelectedSlotPacket;
 import com.pixelmonmod.pixelmon.entities.pixelmon.PixelmonEntity;
 import com.pixelmonmod.pixelmon.entities.pokeballs.OccupiedPokeBallEntity;
@@ -54,6 +64,7 @@ import net.neoforged.neoforge.common.NeoForge;
 import org.joml.Matrix4f;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -109,6 +120,7 @@ public class MintAutoFarmClient {
     private static boolean wasInBattle = false;
     private static int battleTicks = 0;
     private static int fleeAttempts = 0;
+    private static int switchCooldownTicks = 0;
     private static long lastHealTime = 0;
 
     // Snapshot of player inventory (slots 9 to 44) before each forage
@@ -129,6 +141,7 @@ public class MintAutoFarmClient {
             wasInBattle = false;
             battleTicks = 0;
             fleeAttempts = 0;
+            switchCooldownTicks = 0;
         } else {
             state = State.FIND_BEST_BLOCK;
             stateTimer = 0;
@@ -139,6 +152,7 @@ public class MintAutoFarmClient {
             wasInBattle = false;
             battleTicks = 0;
             fleeAttempts = 0;
+            switchCooldownTicks = 0;
         }
     }
 
@@ -179,6 +193,10 @@ public class MintAutoFarmClient {
         }
 
         if (!active) return;
+
+        if (switchCooldownTicks > 0) {
+            switchCooldownTicks--;
+        }
 
         if (!mc.player.isAlive()) return;
 
@@ -907,33 +925,231 @@ public class MintAutoFarmClient {
     }
 
     private static void attackInBattle(Minecraft mc) {
-        if (mc.screen instanceof BattleScreen bs) {
-            // Try attack slots 0, 1, 2, 3
-            boolean chosen = false;
-            for (int i = 0; i < 4; i++) {
-                try {
-                    if (bs.chooseAttackUsingKeyPress(i)) {
-                        chosen = true;
-                        break;
+        ClientBattleManager bm = ClientProxy.battleManager;
+        if (bm == null || !bm.isBattling()) return;
+
+        if (switchCooldownTicks > 0) {
+            return;
+        }
+
+        PixelmonClientData enemy = PixelmonEffectivenessHelper.getActiveEnemy(bm);
+        List<Holder<Type>> enemyTypes = (enemy != null) ? enemy.getTypes() : null;
+        boolean inverse = bm.getOrDefault(ContextKeys.INVERSE_BATTLE, false);
+
+        PixelmonClientData activeOur = bm.getCurrentPokemon();
+        PlayerPartyStorage party = ClientStorageManager.party();
+
+        // 1. Check moveset on active Pokémon
+        Moveset moveset = (activeOur != null) ? activeOur.moveset : null;
+        if ((moveset == null || moveset.isEmpty()) && activeOur != null && party != null) {
+            Pokemon p = party.get(activeOur.pokemonUUID);
+            if (p != null) {
+                moveset = p.getMoveset();
+            }
+        }
+
+        int bestMoveIndex = -1;
+        double bestMoveScore = -1.0;
+        Attack bestAttack = null;
+
+        if (moveset != null) {
+            for (int i = 0; i < moveset.size(); i++) {
+                Attack attack = moveset.get(i);
+                if (attack == null || attack.getMove() == null) continue;
+                if (attack.getPP() <= 0) continue; // Out of PP
+
+                AttackCategory cat = attack.getAttackCategory();
+                if (cat == AttackCategory.STATUS) {
+                    // Status move has no direct damage: low priority fallback (0.1 score)
+                    if (bestMoveScore < 0.1) {
+                        bestMoveScore = 0.1;
+                        bestMoveIndex = i;
+                        bestAttack = attack;
                     }
-                } catch (Throwable ignored) {}
+                    continue;
+                }
+
+                // Damaging move (PHYSICAL / SPECIAL)
+                Type attackType = attack.getType().value();
+                double mult = (enemyTypes != null && !enemyTypes.isEmpty())
+                    ? PixelmonEffectivenessHelper.calculateEffectiveness(attack, attackType, enemyTypes, inverse)
+                    : 1.0;
+
+                if (mult == 0.0) {
+                    // IMMUNE! (e.g. Laser on Dark / Normal on Ghost / Electric on Ground)
+                    // Does 0 damage! Do not pick!
+                    continue;
+                }
+
+                int basePower = attack.getMove().getBasePower();
+                if (basePower <= 0) basePower = 60;
+
+                double score = basePower * mult;
+
+                // STAB bonus (x1.5 if move matches user's type)
+                if (activeOur != null && activeOur.getTypes() != null) {
+                    for (Holder<Type> ourType : activeOur.getTypes()) {
+                        if (ourType != null && ourType.is(attack.getType().unwrapKey().orElse(null))) {
+                            score *= 1.5;
+                            break;
+                        }
+                    }
+                }
+
+                if (score > bestMoveScore) {
+                    bestMoveScore = score;
+                    bestMoveIndex = i;
+                    bestAttack = attack;
+                }
             }
-            if (!chosen && ClientProxy.battleManager != null) {
+        }
+
+        boolean hasDamagingMove = (bestMoveIndex != -1 && bestMoveScore >= 1.0);
+
+        // 2. If active Pokémon has NO attacking moves (or all have 0 PP / enemy is immune):
+        // Switch to the most effective Pokémon in party!
+        if (!hasDamagingMove) {
+            Pokemon bestSwitch = null;
+            double bestSwitchScore = 0.0;
+            Attack bestSwitchAttack = null;
+
+            UUID currentUUID = (activeOur != null) ? activeOur.pokemonUUID : null;
+
+            if (party != null && bm.canSwitch) {
+                for (int s = 0; s < party.countAll(); s++) {
+                    Pokemon candidate = party.get(s);
+                    if (candidate == null || candidate.isEgg() || candidate.isFainted() || candidate.getHealth() <= 0) {
+                        continue;
+                    }
+                    if (currentUUID != null && currentUUID.equals(candidate.getUUID())) {
+                        continue; // Skip currently active pokemon
+                    }
+
+                    Moveset cMoves = candidate.getMoveset();
+                    if (cMoves == null) continue;
+
+                    for (int mi = 0; mi < cMoves.size(); mi++) {
+                        Attack cAtk = cMoves.get(mi);
+                        if (cAtk == null || cAtk.getMove() == null) continue;
+                        if (cAtk.getPP() <= 0) continue;
+                        if (cAtk.getAttackCategory() == AttackCategory.STATUS) continue;
+
+                        Type cType = cAtk.getType().value();
+                        double cMult = (enemyTypes != null && !enemyTypes.isEmpty())
+                            ? PixelmonEffectivenessHelper.calculateEffectiveness(cAtk, cType, enemyTypes, inverse)
+                            : 1.0;
+
+                        if (cMult == 0.0) continue; // Immune
+
+                        int cPow = cAtk.getMove().getBasePower();
+                        if (cPow <= 0) cPow = 60;
+
+                        double cScore = cPow * cMult;
+                        if (candidate.getForm() != null && candidate.getForm().getTypes() != null) {
+                            for (Holder<Type> t : candidate.getForm().getTypes()) {
+                                if (t != null && t.value().equals(cType)) {
+                                    cScore *= 1.5;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (cScore > bestSwitchScore) {
+                            bestSwitchScore = cScore;
+                            bestSwitch = candidate;
+                            bestSwitchAttack = cAtk;
+                        }
+                    }
+                }
+            }
+
+            if (bestSwitch != null && currentUUID != null) {
+                String atkName = getAttackDisplayName(bestSwitchAttack);
+                sendChat(mc, "§a[Автофарм] §eСмена покемона на §b" + bestSwitch.getDisplayName().getString()
+                    + " §7(лучшая атака: §f" + atkName + " §a" + String.format(Locale.ROOT, "%.1f★", bestSwitchScore) + "§7)");
+                statusText = "Смена на " + bestSwitch.getDisplayName().getString();
+                switchPokemonInBattle(bm, bestSwitch.getUUID(), currentUUID, false);
+                switchCooldownTicks = 30; // Wait 1.5s for switch to complete
+                return;
+            }
+        }
+
+        // 3. Execute the best move found
+        if (bestMoveIndex != -1) {
+            if (bestAttack != null) {
+                String atkName = getAttackDisplayName(bestAttack);
+                sendChat(mc, "§a[Автофарм] §cАтака: §e" + atkName + " §7(эффективность: §a" + String.format(Locale.ROOT, "%.1f★", bestMoveScore) + "§7)");
+                statusText = "Атака: " + atkName;
+            }
+
+            if (mc.screen instanceof BattleScreen bs) {
                 try {
-                    ClientProxy.battleManager.afkSelectMove();
+                    bs.selectScreenImmediate(BattleMode.CHOOSE_ATTACK);
+                } catch (Throwable ignored) {}
+
+                boolean chosen = bs.chooseAttackUsingKeyPress(bestMoveIndex);
+                if (!chosen) {
+                    try {
+                        bm.selectedAttack = bestMoveIndex;
+                        bm.afkSelectMove();
+                    } catch (Throwable ignored) {}
+                }
+            } else {
+                try {
+                    bm.selectedAttack = bestMoveIndex;
+                    bm.afkSelectMove();
                 } catch (Throwable ignored) {}
             }
-        } else if (ClientProxy.battleManager != null) {
+        } else {
+            // Absolute fallback: afk select move or struggle
             try {
-                ClientProxy.battleManager.afkSelectMove();
+                bm.afkSelectMove();
             } catch (Throwable ignored) {}
         }
+    }
+
+    public static void switchPokemonInBattle(ClientBattleManager bm, UUID newPokemonUUID, UUID currentPokemonUUID, boolean instant) {
+        if (bm == null || newPokemonUUID == null) return;
+        try {
+            BattleActionPacket packet = new BattleActionPacket(
+                bm.battleControllerIndex,
+                new SwitchBattleAction(newPokemonUUID, currentPokemonUUID, instant)
+            );
+            if (bm.selectedActions == null) {
+                bm.selectedActions = new java.util.ArrayList<>();
+            }
+            bm.selectedActions.add(packet);
+            PixelmonClientData newPig = bm.getPokemon(newPokemonUUID);
+            if (newPig != null) {
+                newPig.isSwitchingIn = true;
+            }
+            bm.selectedMove();
+        } catch (Throwable t) {
+            try {
+                NetworkHelper.sendToServer(new BattleActionPacket(
+                    bm.battleControllerIndex,
+                    new SwitchBattleAction(newPokemonUUID, currentPokemonUUID, instant)
+                ));
+            } catch (Throwable ignored) {}
+        }
+    }
+
+    public static String getAttackDisplayName(Attack attack) {
+        if (attack == null || attack.getMove() == null) return "Атака";
+        try {
+            String key = attack.getMove().getTranslationKey();
+            if (key != null && !key.isEmpty()) {
+                return Component.translatable(key).getString();
+            }
+        } catch (Throwable ignored) {}
+        return attack.getMove().getAttackName();
     }
 
     private static void handleBattleEnded(Minecraft mc) {
         wasInBattle = false;
         battleTicks = 0;
         fleeAttempts = 0;
+        switchCooldownTicks = 0;
         statusText = "Битва окончена. Продолжение автофарма...";
         sendChat(mc, "§a[Автофарм] §eДикая битва завершена!");
 
