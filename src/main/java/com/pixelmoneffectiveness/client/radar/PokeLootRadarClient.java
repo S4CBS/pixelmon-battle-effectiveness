@@ -9,6 +9,7 @@ import com.pixelmonmod.pixelmon.api.util.LootClaim;
 import com.pixelmonmod.pixelmon.blocks.enums.EnumPokeChestType;
 import com.pixelmonmod.pixelmon.blocks.enums.EnumPokechestVisibility;
 import com.pixelmonmod.pixelmon.blocks.tileentity.PokeChestTileEntity;
+import com.pixelmonmod.pixelmon.blocks.tileentity.PokeStopTileEntity;
 import com.pixelmonmod.pixelmon.battles.raids.RaidType;
 import com.pixelmonmod.pixelmon.battles.raids.data.RaidData;
 import com.pixelmonmod.pixelmon.entities.DenEntity;
@@ -88,6 +89,9 @@ public class PokeLootRadarClient {
         NeoForge.EVENT_BUS.addListener(PokeLootRadarClient::onRightClickBlock);
         NeoForge.EVENT_BUS.addListener(PokeLootRadarClient::onClientChatReceived);
         Pixelmon.EVENT_BUS.addListener(PokeLootRadarClient::onPokeLootClaim);
+        try {
+            Pixelmon.EVENT_BUS.addListener(PokeLootRadarClient::onPokeStopUse);
+        } catch (Throwable ignored) {}
     }
 
     public static void onRegisterKeyMappings(RegisterKeyMappingsEvent event) {
@@ -152,15 +156,29 @@ public class PokeLootRadarClient {
         markChestCooldown(event.chest.getBlockPos());
     }
 
+    public static void onPokeStopUse(com.pixelmonmod.pixelmon.api.events.PokeStopEvent.Use.Post event) {
+        if (event.getPokestop() == null) return;
+        markChestCooldown(event.getPokestop().getBlockPos());
+    }
+
     public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
         BlockPos pos = event.getPos();
         if (event.getLevel().isClientSide()) {
             Minecraft mc = Minecraft.getInstance();
-            if (mc.player != null && event.getLevel().getBlockEntity(pos) instanceof PokeChestTileEntity clientChest) {
-                lastClickedChestPos = pos;
-                lastClickedChestTime = System.currentTimeMillis();
-                if (!clientChest.canClaim(mc.player.getUUID())) {
-                    markChestCooldown(pos);
+            if (mc.player != null) {
+                BlockEntity be = event.getLevel().getBlockEntity(pos);
+                if (be instanceof PokeChestTileEntity clientChest) {
+                    lastClickedChestPos = pos;
+                    lastClickedChestTime = System.currentTimeMillis();
+                    if (!clientChest.canClaim(mc.player.getUUID())) {
+                        markChestCooldown(pos);
+                    }
+                } else if (be instanceof PokeStopTileEntity clientStop) {
+                    lastClickedChestPos = pos;
+                    lastClickedChestTime = System.currentTimeMillis();
+                    if (!clientStop.canClaim(mc.player)) {
+                        markChestCooldown(pos);
+                    }
                 }
             }
         } else {
@@ -173,6 +191,13 @@ public class PokeLootRadarClient {
                             sLevel.sendBlockUpdated(pos, sChest.getBlockState(), sChest.getBlockState(), 3);
                         }
                     }
+                } else if (event.getLevel().getBlockEntity(pos) instanceof PokeStopTileEntity sStop) {
+                    if (event.getEntity() instanceof Player p && !sStop.canClaim(p)) {
+                        markChestCooldown(pos);
+                        if (event.getLevel() instanceof ServerLevel sLevel) {
+                            sLevel.sendBlockUpdated(pos, sStop.getBlockState(), sStop.getBlockState(), 3);
+                        }
+                    }
                 }
             } catch (Throwable ignored) {}
         }
@@ -183,7 +208,8 @@ public class PokeLootRadarClient {
         String text = event.getMessage().getString().toLowerCase(Locale.ROOT);
         if (text.contains("собрали этот покелут") || text.contains("попробуйте ещё раз позже")
             || text.contains("попробуйте еще раз позже") || text.contains("already claimed")
-            || text.contains("timedclaim") || text.contains("claimedloot")) {
+            || text.contains("timedclaim") || text.contains("claimedloot")
+            || text.contains("покестоп") || text.contains("pokestop")) {
             Minecraft mc = Minecraft.getInstance();
             if (mc.player != null) {
                 if (lastClickedChestPos != null && (System.currentTimeMillis() - lastClickedChestTime < 4000)) {
@@ -298,6 +324,31 @@ public class PokeLootRadarClient {
                         foundLoot.add(new PokeLootEntry(pos, tier, isHidden, dist, relAngle));
 
                         if ((tier == PokeLootTier.MASTER || tier == PokeLootTier.BEAST) && !knownHighTierPositions.contains(pos)) {
+                            knownHighTierPositions.add(pos);
+                            foundNewHighTier = true;
+                        }
+                    } else if (be instanceof PokeStopTileEntity pokestop) {
+                        BlockPos pos = pokestop.getBlockPos();
+                        boolean onCooldown = !pokestop.canClaim(player);
+                        boolean hideOnCooldown = EffectivenessConfig.CONFIG != null && EffectivenessConfig.CONFIG.radarHideOnCooldown.get();
+                        if (onCooldown && hideOnCooldown) {
+                            continue;
+                        }
+
+                        PokeStopTier stopTier = PokeStopTier.fromBlock(pokestop.getBlockState().getBlock());
+                        if (!stopTier.isSearchEnabled()) {
+                            continue;
+                        }
+
+                        double dx = pos.getX() + 0.5 - player.getX();
+                        double dy = pos.getY() + 0.5 - player.getY();
+                        double dz = pos.getZ() + 0.5 - player.getZ();
+                        double dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                        double relAngle = calculateRelativeAngle(dx, dz, player.getYRot());
+
+                        foundLoot.add(new PokeLootEntry(pos, stopTier, onCooldown, dist, relAngle));
+
+                        if (stopTier == PokeStopTier.LEGENDARY && !knownHighTierPositions.contains(pos)) {
                             knownHighTierPositions.add(pos);
                             foundNewHighTier = true;
                         }
@@ -565,6 +616,16 @@ public class PokeLootRadarClient {
         if (player == null) return;
 
         cachedEntries.removeIf(entry -> {
+            if (entry.isPokeStop) {
+                if (EffectivenessConfig.CONFIG != null && EffectivenessConfig.CONFIG.radarHideOnCooldown.get()) {
+                    Long expire = localCooldownMap.get(entry.pos);
+                    if (expire != null && System.currentTimeMillis() < expire) return true;
+                    if (mc.level != null && mc.level.getBlockEntity(entry.pos) instanceof PokeStopTileEntity pokestop) {
+                        return !pokestop.canClaim(mc.player);
+                    }
+                }
+                return false;
+            }
             PokeChestTileEntity chest = null;
             if (mc.level != null && mc.level.getBlockEntity(entry.pos) instanceof PokeChestTileEntity c) {
                 chest = c;
@@ -693,17 +754,19 @@ public class PokeLootRadarClient {
         for (int i = 0; i < maxLootRows; i++) {
             PokeLootEntry entry = cachedEntries.get(i);
             String arrow = getDirectionArrow(entry.relativeAngle);
-            String name = entry.tier.getDisplayName(isRu);
-            String hiddenTag = entry.isHidden ? (isRu ? " §7[Скрыт]" : " §7[H]") : "";
+            String name = entry.getDisplayName(isRu);
+            String extraTag = entry.isPokeStop
+                ? (entry.isOnCooldown ? (isRu ? " §7[КД]" : " §7[CD]") : "")
+                : (entry.isHidden ? (isRu ? " §7[Скрыт]" : " §7[H]") : "");
             String distStr = (int) Math.round(entry.distance) + "m";
 
             int yDiff = entry.pos.getY() - mc.player.getBlockY();
             String yTag = (yDiff > 2) ? " §7↑" : (yDiff < -2) ? " §7↓" : "";
 
-            String leftText = entry.tier.getIconPrefix() + " " + name + hiddenTag;
+            String leftText = entry.getIconPrefix() + " " + name + extraTag;
             String rightText = "§f" + distStr + yTag + " §b" + arrow;
 
-            guiGraphics.drawString(font, leftText, startX + padding, rowY, entry.tier.getHudColor(), false);
+            guiGraphics.drawString(font, leftText, startX + padding, rowY, entry.getHudColor(), false);
             int rightWidth = font.width(rightText);
             guiGraphics.drawString(font, rightText, startX + boxWidth - padding - rightWidth, rowY, 0xFFFFFFFF, false);
 
@@ -739,11 +802,14 @@ public class PokeLootRadarClient {
                 continue;
             }
 
-            float alpha = entry.isHidden ? 0.75f : 1.0f;
+            float alpha = entry.isHidden ? 0.75f : (entry.isOnCooldown ? 0.6f : 1.0f);
+            ResourceLocation texture = entry.getTexture();
+            double yOffsetIcon = entry.isPokeStop ? 0.8 : 0.35;
+            double yOffsetLabel = entry.isPokeStop ? 1.8 : 1.2;
 
-            // In-world see-through Pokéball icon right at the chest position (y + 0.35)
+            // In-world see-through icon
             double cx = entry.pos.getX() + 0.5 - camPos.x;
-            double cy = entry.pos.getY() + 0.35 - camPos.y;
+            double cy = entry.pos.getY() + yOffsetIcon - camPos.y;
             double cz = entry.pos.getZ() + 0.5 - camPos.z;
 
             poseStack.pushPose();
@@ -754,12 +820,14 @@ public class PokeLootRadarClient {
             float ballScale = (float) Math.max(0.5f, Math.min(1.4f, entry.distance * 0.04f));
             poseStack.scale(ballScale, -ballScale, ballScale);
 
-            drawIcon(bufferSource, poseStack.last().pose(), entry.tier.getBallTexture(), -0.5f, -0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, alpha);
+            if (texture != null) {
+                drawIcon(bufferSource, poseStack.last().pose(), texture, -0.5f, -0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 1.0f, 1.0f, alpha);
+            }
             poseStack.popPose();
 
-            // Billboard text and icon floating above the chest (y + 1.2)
+            // Billboard text and icon floating above (y + yOffsetLabel)
             double lx = entry.pos.getX() + 0.5 - camPos.x;
-            double ly = entry.pos.getY() + 1.2 - camPos.y;
+            double ly = entry.pos.getY() + yOffsetLabel - camPos.y;
             double lz = entry.pos.getZ() + 0.5 - camPos.z;
 
             poseStack.pushPose();
@@ -771,18 +839,22 @@ public class PokeLootRadarClient {
             float scale = (float) Math.max(0.02f, Math.min(0.06f, entry.distance * 0.0025f));
             poseStack.scale(-scale, -scale, scale);
 
-            String name = entry.tier.getDisplayName(isRu);
-            String hiddenTag = entry.isHidden ? (isRu ? " [Скрытый]" : " [Hidden]") : "";
-            String label = entry.tier.getIconPrefix() + " " + name + " " + (int) Math.round(entry.distance) + "m" + hiddenTag;
+            String name = entry.getDisplayName(isRu);
+            String extraTag = entry.isPokeStop
+                ? (entry.isOnCooldown ? (isRu ? " [КД]" : " [CD]") : "")
+                : (entry.isHidden ? (isRu ? " [Скрытый]" : " [Hidden]") : "");
+            String label = entry.getIconPrefix() + " " + name + " " + (int) Math.round(entry.distance) + "m" + extraTag;
             float textWidth = font.width(label);
 
-            drawIcon(bufferSource, poseStack.last().pose(), entry.tier.getBallTexture(), -7f, -17f, 7f, -3f, 1.0f, 0.0f, 0.0f, 1.0f, alpha);
+            if (texture != null) {
+                drawIcon(bufferSource, poseStack.last().pose(), texture, -7f, -17f, 7f, -3f, 1.0f, 0.0f, 0.0f, 1.0f, alpha);
+            }
 
             font.drawInBatch(
                 label,
                 -textWidth / 2f,
                 0,
-                entry.tier.getColorRgb(),
+                entry.getColorRgb(),
                 false,
                 poseStack.last().pose(),
                 bufferSource,

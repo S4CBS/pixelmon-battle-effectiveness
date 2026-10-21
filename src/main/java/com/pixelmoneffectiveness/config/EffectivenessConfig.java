@@ -33,6 +33,9 @@ public class EffectivenessConfig {
     public final ModConfigSpec.BooleanValue searchSpecial;
     public final ModConfigSpec.BooleanValue searchPoke;
     public final ModConfigSpec.BooleanValue searchHidden;
+    public final ModConfigSpec.BooleanValue searchPokestopLegendary;
+    public final ModConfigSpec.BooleanValue searchPokestopRare;
+    public final ModConfigSpec.BooleanValue searchPokestopCommon;
     public final ModConfigSpec.BooleanValue pokemonRadarEnabled;
     public final ModConfigSpec.ConfigValue<String> pokemonSearchFilter;
     public final ModConfigSpec.BooleanValue pokemonShowRareWithoutFilter;
@@ -186,6 +189,21 @@ public class EffectivenessConfig {
             .comment("Искать скрытый лут (невидимые сундуки-покеболы).",
                      "Search for hidden Poké chests (invisible pokeballs).")
             .define("searchHidden", true);
+
+        searchPokestopLegendary = builder
+            .comment("Искать ли легендарные покестопы на радаре.",
+                     "Search for legendary pokestops on radar.")
+            .define("searchPokestopLegendary", true);
+
+        searchPokestopRare = builder
+            .comment("Искать ли редкие покестопы на радаре.",
+                     "Search for rare pokestops on radar.")
+            .define("searchPokestopRare", true);
+
+        searchPokestopCommon = builder
+            .comment("Искать ли обычные покестопы на радаре.",
+                     "Search for common pokestops on radar.")
+            .define("searchPokestopCommon", true);
 
         pokemonRadarEnabled = builder
             .comment("Включить поиск и отображение покемонов на радаре.",

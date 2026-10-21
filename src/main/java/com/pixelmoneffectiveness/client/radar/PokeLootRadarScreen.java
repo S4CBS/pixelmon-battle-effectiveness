@@ -13,7 +13,7 @@ import java.util.Locale;
 public class PokeLootRadarScreen extends Screen {
 
     private static final int DIALOG_WIDTH = 270;
-    private static final int DIALOG_HEIGHT = 326;
+    private static final int DIALOG_HEIGHT = 336;
 
     private EditBox searchBox;
 
@@ -38,22 +38,22 @@ public class PokeLootRadarScreen extends Screen {
         int col2X = left + 138;
         int btnWidth = 122;
 
-        // --- Section 1: PokéLoot Tiers ---
+        // --- Section 1: PokéLoot Chests ---
         // Row 1: Master & Beast
-        this.addRenderableWidget(createTierButton(PokeLootTier.MASTER, col1X, top + 37, btnWidth, 19, isRu));
-        this.addRenderableWidget(createTierButton(PokeLootTier.BEAST, col2X, top + 37, btnWidth, 19, isRu));
+        this.addRenderableWidget(createTierButton(PokeLootTier.MASTER, col1X, top + 36, btnWidth, 18, isRu));
+        this.addRenderableWidget(createTierButton(PokeLootTier.BEAST, col2X, top + 36, btnWidth, 18, isRu));
 
         // Row 2: Ultra & Special
-        this.addRenderableWidget(createTierButton(PokeLootTier.ULTRA, col1X, top + 58, btnWidth, 19, isRu));
-        this.addRenderableWidget(createTierButton(PokeLootTier.SPECIAL, col2X, top + 58, btnWidth, 19, isRu));
+        this.addRenderableWidget(createTierButton(PokeLootTier.ULTRA, col1X, top + 56, btnWidth, 18, isRu));
+        this.addRenderableWidget(createTierButton(PokeLootTier.SPECIAL, col2X, top + 56, btnWidth, 18, isRu));
 
         // Row 3: Poké & Hidden
-        this.addRenderableWidget(createTierButton(PokeLootTier.POKE, col1X, top + 79, btnWidth, 19, isRu));
-        this.addRenderableWidget(createHiddenButton(col2X, top + 79, btnWidth, 19, isRu));
+        this.addRenderableWidget(createTierButton(PokeLootTier.POKE, col1X, top + 76, btnWidth, 18, isRu));
+        this.addRenderableWidget(createHiddenButton(col2X, top + 76, btnWidth, 18, isRu));
 
-        // Row 4 (Presets): All ON & Rare Only
-        Button allOnBtn = Button.builder(
-            Component.literal(isRu ? "✓ Все типы" : "✓ Enable All"),
+        // Row 4: Presets: All Chests & Rare Chests
+        Button allChestsBtn = Button.builder(
+            Component.literal(isRu ? "✓ Все сундуки" : "✓ All Chests"),
             btn -> {
                 for (PokeLootTier tier : PokeLootTier.values()) {
                     tier.setSearchEnabled(true);
@@ -65,13 +65,13 @@ public class PokeLootRadarScreen extends Screen {
                 rebuildScreen();
             }
         )
-        .bounds(col1X, top + 100, btnWidth, 18)
+        .bounds(col1X, top + 96, btnWidth, 18)
         .tooltip(Tooltip.create(Component.literal(isRu ? "Включить поиск всех типов сундуков" : "Search for all chest types")))
         .build();
-        this.addRenderableWidget(allOnBtn);
+        this.addRenderableWidget(allChestsBtn);
 
-        Button rareOnlyBtn = Button.builder(
-            Component.literal(isRu ? "★ Только редкие" : "★ Rare Only"),
+        Button rareChestsBtn = Button.builder(
+            Component.literal(isRu ? "★ Редкие сундуки" : "★ Rare Chests"),
             btn -> {
                 PokeLootTier.MASTER.setSearchEnabled(true);
                 PokeLootTier.BEAST.setSearchEnabled(true);
@@ -85,13 +85,41 @@ public class PokeLootRadarScreen extends Screen {
                 rebuildScreen();
             }
         )
-        .bounds(col2X, top + 100, btnWidth, 18)
-        .tooltip(Tooltip.create(Component.literal(isRu ? "Искать только Мастер, Бист и Ультра" : "Search only Master, Beast, and Ultra")))
+        .bounds(col2X, top + 96, btnWidth, 18)
+        .tooltip(Tooltip.create(Component.literal(isRu ? "Искать только Мастер, Бист и Ультра сундуки" : "Search only Master, Beast, and Ultra chests")))
         .build();
-        this.addRenderableWidget(rareOnlyBtn);
+        this.addRenderableWidget(rareChestsBtn);
 
-        // --- Section 2: Pokémon Search ---
-        searchBox = new EditBox(this.font, col1X, top + 137, 160, 18, Component.literal("Search"));
+        // --- Section 2: PokéStops ---
+        // Row 5: Legendary & Rare PokéStops
+        this.addRenderableWidget(createPokeStopButton(PokeStopTier.LEGENDARY, col1X, top + 131, btnWidth, 18, isRu));
+        this.addRenderableWidget(createPokeStopButton(PokeStopTier.RARE, col2X, top + 131, btnWidth, 18, isRu));
+
+        // Row 6: Common PokéStop & All PokéStops Toggle
+        this.addRenderableWidget(createPokeStopButton(PokeStopTier.COMMON, col1X, top + 151, btnWidth, 18, isRu));
+
+        boolean allStopsOn = PokeStopTier.LEGENDARY.isSearchEnabled()
+            && PokeStopTier.RARE.isSearchEnabled()
+            && PokeStopTier.COMMON.isSearchEnabled();
+        String allStatus = allStopsOn ? (isRu ? "§aВКЛ" : "§aON") : (isRu ? "§cВЫКЛ" : "§cOFF");
+        String allLabel = (isRu ? "⚑ Все ПокеСтопы: " : "⚑ All Stops: ") + allStatus;
+        Button allStopsBtn = Button.builder(
+            Component.literal(allLabel),
+            btn -> {
+                boolean target = !allStopsOn;
+                PokeStopTier.LEGENDARY.setSearchEnabled(target);
+                PokeStopTier.RARE.setSearchEnabled(target);
+                PokeStopTier.COMMON.setSearchEnabled(target);
+                rebuildScreen();
+            }
+        )
+        .bounds(col2X, top + 151, btnWidth, 18)
+        .tooltip(Tooltip.create(Component.literal(isRu ? "Переключить поиск всех видов ПокеСтопов" : "Toggle all PokéStop types on or off")))
+        .build();
+        this.addRenderableWidget(allStopsBtn);
+
+        // --- Section 3: Pokémon Search ---
+        searchBox = new EditBox(this.font, col1X, top + 186, 160, 18, Component.literal("Search"));
         searchBox.setMaxLength(128);
         String currentFilter = (EffectivenessConfig.CONFIG != null) ? EffectivenessConfig.CONFIG.pokemonSearchFilter.get() : "";
         searchBox.setValue(currentFilter);
@@ -107,7 +135,7 @@ public class PokeLootRadarScreen extends Screen {
         Button clearBtn = Button.builder(Component.literal("✕"), btn -> {
             searchBox.setValue("");
         })
-        .bounds(col1X + 164, top + 137, 20, 18)
+        .bounds(col1X + 164, top + 186, 20, 18)
         .tooltip(Tooltip.create(Component.literal(isRu ? "Очистить поиск" : "Clear search")))
         .build();
         this.addRenderableWidget(clearBtn);
@@ -117,12 +145,12 @@ public class PokeLootRadarScreen extends Screen {
                 this.minecraft.setScreen(new PokemonPokedexScreen(this));
             }
         })
-        .bounds(col1X + 188, top + 137, 62, 18)
+        .bounds(col1X + 188, top + 186, 62, 18)
         .tooltip(Tooltip.create(Component.literal(isRu ? "Открыть Покедекс для выбора покемонов со спрайтами" : "Open Pokédex to choose Pokémon with sprites")))
         .build();
         this.addRenderableWidget(dexBtn);
 
-        // Pokémon Radar toggle & Rare Without Filter toggle
+        // Row 8: Pokémon Radar toggle & Rare Without Filter toggle
         boolean pokeActive = EffectivenessConfig.CONFIG != null && EffectivenessConfig.CONFIG.pokemonRadarEnabled.get();
         String pokeStatus = pokeActive ? (isRu ? "§aВКЛ" : "§aON") : (isRu ? "§cВЫКЛ" : "§cOFF");
         String pokeLabel = (isRu ? "Радар пок.: " : "Poke radar: ") + pokeStatus;
@@ -136,7 +164,7 @@ public class PokeLootRadarScreen extends Screen {
                 rebuildScreen();
             }
         )
-        .bounds(col1X, top + 158, btnWidth, 19)
+        .bounds(col1X, top + 206, btnWidth, 18)
         .tooltip(Tooltip.create(Component.literal(isRu ? "Включить или отключить поиск покемонов на радаре" : "Toggle Pokémon radar tracking")))
         .build();
         this.addRenderableWidget(pokeToggle);
@@ -154,26 +182,13 @@ public class PokeLootRadarScreen extends Screen {
                 rebuildScreen();
             }
         )
-        .bounds(col2X, top + 158, btnWidth, 19)
+        .bounds(col2X, top + 206, btnWidth, 18)
         .tooltip(Tooltip.create(Component.literal(isRu ? "Всегда показывать Боссов, Шайни и Легендарных на радаре (даже если активен поиск)" : "Always show Bosses, Shinies, and Legendaries on radar (even with active filter)")))
         .build();
         this.addRenderableWidget(rareToggle);
 
-        // Large Pokédex button
-        Button bigDexBtn = Button.builder(
-            Component.literal(isRu ? "📖 Выбрать покемонов из Покедекса..." : "📖 Select Pokémon from Pokédex..."),
-            btn -> {
-                if (this.minecraft != null) {
-                    this.minecraft.setScreen(new PokemonPokedexScreen(this));
-                }
-            }
-        )
-        .bounds(left + 10, top + 179, 250, 19)
-        .tooltip(Tooltip.create(Component.literal(isRu ? "Открыть интерактивный Покедекс со спрайтами, номерами и фильтрами" : "Open visual Pokédex with sprites, numbers, and filters")))
-        .build();
-        this.addRenderableWidget(bigDexBtn);
-
-        // --- Section 3: Radar Display Options ---
+        // --- Section 4: Radar Display Options ---
+        // Row 9: Radar master & HUD compass
         boolean rActive = PokeLootRadarClient.isRadarActive();
         String rStatus = rActive ? (isRu ? "§aВКЛ" : "§cВЫКЛ") : (isRu ? "§cВЫКЛ" : "§cOFF");
         String rLabel = (isRu ? "Радар: " : "Radar: ") + rStatus;
@@ -189,7 +204,7 @@ public class PokeLootRadarScreen extends Screen {
                 rebuildScreen();
             }
         )
-        .bounds(col1X, top + 217, btnWidth, 19)
+        .bounds(col1X, top + 241, btnWidth, 18)
         .tooltip(Tooltip.create(Component.literal(isRu ? "Главное включение/отключение радара (клавиша O)" : "Master radar toggle (key O)")))
         .build();
         this.addRenderableWidget(radarToggle);
@@ -207,12 +222,12 @@ public class PokeLootRadarScreen extends Screen {
                 rebuildScreen();
             }
         )
-        .bounds(col2X, top + 217, btnWidth, 19)
+        .bounds(col2X, top + 241, btnWidth, 18)
         .tooltip(Tooltip.create(Component.literal(isRu ? "Экранная панель со стрелками и дистанцией" : "On-screen direction and distance HUD panel")))
         .build();
         this.addRenderableWidget(hudToggle);
 
-        // Row 7: 3D ESP & Sound Alert
+        // Row 10: 3D ESP & Sound Alert
         boolean espOn = EffectivenessConfig.CONFIG != null && EffectivenessConfig.CONFIG.radarEsp3dEnabled.get();
         String espStatus = espOn ? (isRu ? "§aВКЛ" : "§aON") : (isRu ? "§cВЫКЛ" : "§cOFF");
         String espLabel = (isRu ? "3D метки: " : "3D ESP: ") + espStatus;
@@ -226,8 +241,8 @@ public class PokeLootRadarScreen extends Screen {
                 rebuildScreen();
             }
         )
-        .bounds(col1X, top + 238, btnWidth, 19)
-        .tooltip(Tooltip.create(Component.literal(isRu ? "3D метки лута и покемонов сквозь блоки прямо в мире" : "In-world 3D markers through blocks")))
+        .bounds(col1X, top + 261, btnWidth, 18)
+        .tooltip(Tooltip.create(Component.literal(isRu ? "3D метки лута, покестопов и покемонов прямо в мире сквозь блоки" : "In-world 3D markers through blocks")))
         .build();
         this.addRenderableWidget(espToggle);
 
@@ -244,12 +259,12 @@ public class PokeLootRadarScreen extends Screen {
                 rebuildScreen();
             }
         )
-        .bounds(col2X, top + 238, btnWidth, 19)
-        .tooltip(Tooltip.create(Component.literal(isRu ? "Звуковой сигнал при нахождении редких покемонов и лута" : "Audio chime when rare pokemon or loot is found")))
+        .bounds(col2X, top + 261, btnWidth, 18)
+        .tooltip(Tooltip.create(Component.literal(isRu ? "Звуковой сигнал при нахождении редких покемонов, покестопов и сундуков" : "Audio chime when rare pokemon, pokestops, or loot is found")))
         .build();
         this.addRenderableWidget(sndToggle);
 
-        // Row 8: Hide on Cooldown toggle & Mint Auto-Farm toggle
+        // Row 11: Hide on Cooldown toggle & Mint Auto-Farm toggle
         boolean hideCd = EffectivenessConfig.CONFIG != null && EffectivenessConfig.CONFIG.radarHideOnCooldown.get();
         String cdStatus = hideCd ? (isRu ? "§aВКЛ" : "§aON") : (isRu ? "§cВЫКЛ" : "§cOFF");
         String cdLabel = (isRu ? "Скрывать КД: " : "Hide on CD: ") + cdStatus;
@@ -263,8 +278,8 @@ public class PokeLootRadarScreen extends Screen {
                 rebuildScreen();
             }
         )
-        .bounds(col1X, top + 259, btnWidth, 19)
-        .tooltip(Tooltip.create(Component.literal(isRu ? "Автоматически скрывать с радара залутанные сундуки на перезарядке" : "Automatically hide looted chests on cooldown from radar")))
+        .bounds(col1X, top + 281, btnWidth, 18)
+        .tooltip(Tooltip.create(Component.literal(isRu ? "Автоматически скрывать с радара залутанные сундуки и покестопы на перезарядке" : "Automatically hide looted chests and pokestops on cooldown from radar")))
         .build();
         this.addRenderableWidget(cdToggle);
 
@@ -278,7 +293,7 @@ public class PokeLootRadarScreen extends Screen {
                 rebuildScreen();
             }
         )
-        .bounds(col2X, top + 259, btnWidth, 19)
+        .bounds(col2X, top + 281, btnWidth, 18)
         .tooltip(Tooltip.create(Component.literal(isRu ? "Автофарм семян мяты (горячая клавиша: J). Автоматически копает дёрн и выбрасывает мусор." : "Mint seeds auto-farm (hotkey: J). Automatically forages grass and drops junk.")))
         .build();
         this.addRenderableWidget(farmToggle);
@@ -292,7 +307,7 @@ public class PokeLootRadarScreen extends Screen {
                 }
             }
         )
-        .bounds(left + 10, top + 292, 122, 22)
+        .bounds(left + 10, top + 307, 122, 22)
         .tooltip(Tooltip.create(Component.literal(isRu ? "Настройки инфо-панели покемона при наведении (Cobblemon HUD)" : "Configure Pokémon info overlay tooltip (Cobblemon HUD)")))
         .build();
         this.addRenderableWidget(overlayBtn);
@@ -301,7 +316,7 @@ public class PokeLootRadarScreen extends Screen {
             Component.literal(isRu ? "✔ Готово" : "✔ Done"),
             btn -> this.onClose()
         )
-        .bounds(left + 138, top + 292, 122, 22)
+        .bounds(left + 138, top + 307, 122, 22)
         .build();
         this.addRenderableWidget(doneBtn);
     }
@@ -343,6 +358,27 @@ public class PokeLootRadarScreen extends Screen {
                 EffectivenessConfig.CONFIG.searchHidden.set(!enabled);
                 EffectivenessConfig.SPEC.save();
             }
+            rebuildScreen();
+        })
+        .bounds(x, y, width, height)
+        .tooltip(Tooltip.create(Component.literal(tooltipText)))
+        .build();
+    }
+
+    private Button createPokeStopButton(PokeStopTier tier, int x, int y, int width, int height, boolean isRu) {
+        boolean enabled = tier.isSearchEnabled();
+        String tierName = tier.getDisplayName(isRu);
+        String status = enabled ? (isRu ? "§aВКЛ" : "§aON") : (isRu ? "§cВЫКЛ" : "§cOFF");
+        String prefix = enabled ? tier.getIconPrefix() : "§8[⚑]";
+        String label = prefix + " " + tierName + ": " + status;
+
+        String tooltipText = isRu
+            ? (enabled ? "Нажмите, чтобы скрыть " + tierName : "Нажмите, чтобы искать " + tierName)
+            : (enabled ? "Click to hide " + tierName : "Click to search for " + tierName);
+
+        return Button.builder(Component.literal(label), btn -> {
+            boolean newState = !tier.isSearchEnabled();
+            tier.setSearchEnabled(newState);
             rebuildScreen();
         })
         .bounds(x, y, width, height)
@@ -407,27 +443,31 @@ public class PokeLootRadarScreen extends Screen {
         guiGraphics.fill(left + DIALOG_WIDTH - 1, top, left + DIALOG_WIDTH, top + DIALOG_HEIGHT, 0xFF1E293B);
 
         // Horizontal dividers
-        guiGraphics.fill(left + 8, top + 23, left + DIALOG_WIDTH - 8, top + 24, 0x33FFFFFF);
-        guiGraphics.fill(left + 8, top + 122, left + DIALOG_WIDTH - 8, top + 123, 0x33FFFFFF);
-        guiGraphics.fill(left + 8, top + 203, left + DIALOG_WIDTH - 8, top + 204, 0x33FFFFFF);
-        guiGraphics.fill(left + 8, top + 283, left + DIALOG_WIDTH - 8, top + 284, 0x33FFFFFF);
+        guiGraphics.fill(left + 8, top + 22, left + DIALOG_WIDTH - 8, top + 23, 0x33FFFFFF);
+        guiGraphics.fill(left + 8, top + 117, left + DIALOG_WIDTH - 8, top + 118, 0x33FFFFFF);
+        guiGraphics.fill(left + 8, top + 172, left + DIALOG_WIDTH - 8, top + 173, 0x33FFFFFF);
+        guiGraphics.fill(left + 8, top + 227, left + DIALOG_WIDTH - 8, top + 228, 0x33FFFFFF);
+        guiGraphics.fill(left + 8, top + 303, left + DIALOG_WIDTH - 8, top + 304, 0x33FFFFFF);
 
         boolean isRu = isRussianLanguage();
 
         // Main Title
         String titleText = isRu ? "⚡ Радар: Настройки" : "⚡ Radar Settings";
         int titleWidth = this.font.width(titleText);
-        guiGraphics.drawString(this.font, titleText, left + (DIALOG_WIDTH - titleWidth) / 2, top + 9, 0xFFFFFF55, false);
+        guiGraphics.drawString(this.font, titleText, left + (DIALOG_WIDTH - titleWidth) / 2, top + 8, 0xFFFFFF55, false);
 
         // Section labels
-        String tiersLabel = isRu ? "§7Типы лута для поиска:" : "§7Loot tiers to search:";
-        guiGraphics.drawString(this.font, tiersLabel, left + 10, top + 26, 0xFFAAAAAA, false);
+        String tiersLabel = isRu ? "§7Сундуки PokéLoot:" : "§7PokéLoot Chests:";
+        guiGraphics.drawString(this.font, tiersLabel, left + 10, top + 25, 0xFFAAAAAA, false);
+
+        String stopsLabel = isRu ? "§7ПокеСтопы (все виды):" : "§7PokéStops (all types):";
+        guiGraphics.drawString(this.font, stopsLabel, left + 10, top + 120, 0xFFAAAAAA, false);
 
         String pokemonLabel = isRu ? "§7Поиск покемонов:" : "§7Pokémon search:";
-        guiGraphics.drawString(this.font, pokemonLabel, left + 10, top + 125, 0xFFAAAAAA, false);
+        guiGraphics.drawString(this.font, pokemonLabel, left + 10, top + 175, 0xFFAAAAAA, false);
 
         String optionsLabel = isRu ? "§7Опции радара:" : "§7Radar display options:";
-        guiGraphics.drawString(this.font, optionsLabel, left + 10, top + 206, 0xFFAAAAAA, false);
+        guiGraphics.drawString(this.font, optionsLabel, left + 10, top + 230, 0xFFAAAAAA, false);
 
         super.render(guiGraphics, mouseX, mouseY, partialTick);
     }
