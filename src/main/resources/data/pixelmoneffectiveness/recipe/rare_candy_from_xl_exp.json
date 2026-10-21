@@ -1,0 +1,25 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    {
+      "item": "pixelmon:xl_exp_candy"
+    },
+    {
+      "item": "pixelmon:xl_exp_candy"
+    },
+    {
+      "item": "pixelmon:xl_exp_candy"
+    },
+    {
+      "item": "pixelmon:xl_exp_candy"
+    },
+    {
+      "item": "minecraft:sugar"
+    }
+  ],
+  "result": {
+    "count": 1,
+    "id": "pixelmon:rare_candy"
+  }
+}

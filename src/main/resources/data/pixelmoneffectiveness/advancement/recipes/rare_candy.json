@@ -1,0 +1,46 @@
+{
+  "parent": "minecraft:recipes/root",
+  "criteria": {
+    "has_sugar": {
+      "conditions": {
+        "items": [
+          {
+            "items": "minecraft:sugar"
+          }
+        ]
+      },
+      "trigger": "minecraft:inventory_changed"
+    },
+    "has_candy": {
+      "conditions": {
+        "items": [
+          {
+            "items": "pixelmon:rare_candy"
+          }
+        ]
+      },
+      "trigger": "minecraft:inventory_changed"
+    },
+    "has_the_recipe": {
+      "conditions": {
+        "recipe": "pixelmoneffectiveness:rare_candy"
+      },
+      "trigger": "minecraft:recipe_unlocked"
+    }
+  },
+  "requirements": [
+    [
+      "has_sugar",
+      "has_candy",
+      "has_the_recipe"
+    ]
+  ],
+  "rewards": {
+    "recipes": [
+      "pixelmoneffectiveness:rare_candy",
+      "pixelmoneffectiveness:rare_candy_from_honey",
+      "pixelmoneffectiveness:rare_candy_from_xl_exp",
+      "pixelmoneffectiveness:rare_candy_from_l_exp"
+    ]
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "SLS",
+    "LCL",
+    "SLS"
+  ],
+  "key": {
+    "S": {
+      "item": "minecraft:sugar"
+    },
+    "L": {
+      "item": "minecraft:lapis_lazuli"
+    },
+    "C": [
+      {
+        "item": "minecraft:golden_apple"
+      },
+      {
+        "item": "minecraft:diamond"
+      }
+    ]
+  },
+  "result": {
+    "count": 1,
+    "id": "pixelmon:rare_candy"
+  }
+}
