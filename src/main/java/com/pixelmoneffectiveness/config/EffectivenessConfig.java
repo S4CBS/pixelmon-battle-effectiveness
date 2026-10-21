@@ -12,6 +12,9 @@ public class EffectivenessConfig {
     public final ModConfigSpec.BooleanValue showForNormalMoves;
     public final ModConfigSpec.BooleanValue showForStatusMoves;
     public final ModConfigSpec.BooleanValue apricornHarvestEnabled;
+    public final ModConfigSpec.BooleanValue raidEffectivenessEnabled;
+    public final ModConfigSpec.BooleanValue battleSwitchEffectivenessEnabled;
+    public final ModConfigSpec.BooleanValue battleSwitchChatNotification;
 
     public final ModConfigSpec.BooleanValue radarEnabled;
     public final ModConfigSpec.BooleanValue radarHudEnabled;
@@ -80,6 +83,21 @@ public class EffectivenessConfig {
             .comment("Включить быстрый сбор всех априкорнов и ягод с дерева при нажатии Shift + ПКМ по стволу или листве.",
                      "Enable harvesting all apricorns and berries from a tree when Shift + Right-Clicking the trunk or leaves.")
             .define("apricornHarvestEnabled", true);
+
+        raidEffectivenessEnabled = builder
+            .comment("Показывать самого эффективного покемона в меню рейда и тера рейда.",
+                     "Show most effective Pokemon in raid and tera raid menus.")
+            .define("raidEffectivenessEnabled", true);
+
+        battleSwitchEffectivenessEnabled = builder
+            .comment("Показывать самого эффективного покемона в меню смены покемона во время битвы.",
+                     "Show most effective Pokemon in battle switch menu.")
+            .define("battleSwitchEffectivenessEnabled", true);
+
+        battleSwitchChatNotification = builder
+            .comment("Писать в чат самого эффективного покемона при открытии меню смены покемона.",
+                     "Send chat message about most effective Pokemon when opening battle switch menu.")
+            .define("battleSwitchChatNotification", true);
 
         builder.pop();
 

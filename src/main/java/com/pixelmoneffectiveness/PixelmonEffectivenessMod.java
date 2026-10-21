@@ -2,8 +2,10 @@ package com.pixelmoneffectiveness;
 
 import com.pixelmoneffectiveness.config.EffectivenessConfig;
 import com.pixelmoneffectiveness.client.autofarm.MintAutoFarmClient;
+import com.pixelmoneffectiveness.client.battle.BattleSwitchOverlayClient;
 import com.pixelmoneffectiveness.client.overlay.PokemonOverlayClient;
 import com.pixelmoneffectiveness.client.radar.PokeLootRadarClient;
+import com.pixelmoneffectiveness.client.raid.RaidMenuOverlayClient;
 import com.pixelmoneffectiveness.handler.ApricornTreeHarvestHandler;
 import com.pixelmoneffectiveness.handler.DittoDisguiseHandler;
 import com.pixelmoneffectiveness.handler.PokemonFreezeDespawnHandler;
@@ -39,6 +41,8 @@ public class PixelmonEffectivenessMod {
             PokeLootRadarClient.init(modEventBus);
             PokemonOverlayClient.init(modEventBus);
             MintAutoFarmClient.init(modEventBus);
+            BattleSwitchOverlayClient.init(modEventBus);
+            RaidMenuOverlayClient.init(modEventBus);
         }
     }
 }
