@@ -364,7 +364,6 @@ public class PokeLootRadarClient {
 
                     boolean trackDitto = EffectivenessConfig.CONFIG == null || EffectivenessConfig.CONFIG.pokemonRadarTrackDitto.get();
                     boolean isConfirmedDitto = trackDitto && DittoDisguiseHelper.isConfirmedDitto(pixelmon);
-                    boolean isDittoDisguise = trackDitto && DittoDisguiseHelper.isDittoDisguiseCandidate(pokemon);
 
                     boolean matched = false;
                     if (hasFilter) {
@@ -380,7 +379,7 @@ public class PokeLootRadarClient {
                                 break;
                             }
                             if (trackDitto && DittoDisguiseHelper.isDittoFilterToken(token)) {
-                                if (isConfirmedDitto || isDittoDisguise || "Ditto".equalsIgnoreCase(speciesName) || "ditto".equalsIgnoreCase(displayName)) {
+                                if (isConfirmedDitto || "Ditto".equalsIgnoreCase(speciesName) || "ditto".equalsIgnoreCase(displayName)) {
                                     matched = true;
                                     break;
                                 }
@@ -439,7 +438,7 @@ public class PokeLootRadarClient {
                             0,
                             false,
                             isConfirmedDitto,
-                            isDittoDisguise
+                            false
                         ));
 
                         if ((isShiny || isLegendary || isBoss || isConfirmedDitto) && !knownSpecialPokemon.contains(pixelmon.getUUID())) {

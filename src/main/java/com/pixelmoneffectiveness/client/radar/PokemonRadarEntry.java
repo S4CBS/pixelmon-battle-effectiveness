@@ -60,7 +60,6 @@ public class PokemonRadarEntry implements Comparable<PokemonRadarEntry> {
             return 0xFFFF5555; // Red
         }
         if (isDitto) return 0xFFFF55FF;         // Bright Magenta for guaranteed Ditto
-        if (isDittoDisguise) return 0xFFDA70D6; // Orchid / Purple for potential Ditto disguise
         if (isShiny) return 0xFFFFD700;      // Gold
         if (isLegendary) return 0xFFFF55FF;  // Light Purple / Magenta
         if (isBoss) {
@@ -85,7 +84,6 @@ public class PokemonRadarEntry implements Comparable<PokemonRadarEntry> {
             return isTeraRaid ? "§b[💎 Рейд " + starStr + "]" : "§c[⚔ Рейд " + starStr + "]";
         }
         if (isDitto) return "§d[🎭 ДИТТО!]";
-        if (isDittoDisguise) return "§5[🎭 Дитто?]";
         if (isShiny) return "§6[✨]";
         if (isLegendary) return "§d[★]";
         if (isBoss) {
@@ -110,8 +108,8 @@ public class PokemonRadarEntry implements Comparable<PokemonRadarEntry> {
         if (thisLegendaryRaid != otherLegendaryRaid) {
             return thisLegendaryRaid ? -1 : 1;
         }
-        boolean thisSpecial = this.isShiny || this.isLegendary || this.isBoss || this.isRaid || this.isDitto || this.isDittoDisguise;
-        boolean otherSpecial = other.isShiny || other.isLegendary || other.isBoss || other.isRaid || other.isDitto || other.isDittoDisguise;
+        boolean thisSpecial = this.isShiny || this.isLegendary || this.isBoss || this.isRaid || this.isDitto;
+        boolean otherSpecial = other.isShiny || other.isLegendary || other.isBoss || other.isRaid || other.isDitto;
         if (thisSpecial != otherSpecial) {
             return thisSpecial ? -1 : 1;
         }

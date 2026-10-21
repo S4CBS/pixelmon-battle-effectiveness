@@ -9,6 +9,7 @@ import com.pixelmonmod.pixelmon.api.registries.PixelmonSpecies;
 import com.pixelmonmod.pixelmon.api.util.helpers.RandomHelper;
 import com.pixelmonmod.pixelmon.entities.pixelmon.PixelmonEntity;
 import com.pixelmoneffectiveness.client.radar.DittoDisguiseHelper;
+import com.pixelmoneffectiveness.config.EffectivenessConfig;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -57,7 +58,9 @@ public class DittoDisguiseHandler {
 
                 double chance = 0.001; // Default 0.1%
                 try {
-                    if (p.getSpecies() != null && "Meltan".equalsIgnoreCase(p.getSpecies().getName())) {
+                    if (EffectivenessConfig.CONFIG != null && EffectivenessConfig.CONFIG.dittoDisguiseChance.get() >= 0.0) {
+                        chance = EffectivenessConfig.CONFIG.dittoDisguiseChance.get();
+                    } else if (p.getSpecies() != null && "Meltan".equalsIgnoreCase(p.getSpecies().getName())) {
                         chance = PixelmonConfigProxy.getSpawningMeltan().getMeltanTransformChance();
                     } else if (PixelmonConfigProxy.getSpawning() != null) {
                         chance = PixelmonConfigProxy.getSpawning().getTransformToDittoOnCatch();
