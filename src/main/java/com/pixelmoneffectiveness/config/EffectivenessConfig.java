@@ -15,6 +15,9 @@ public class EffectivenessConfig {
     public final ModConfigSpec.BooleanValue raidEffectivenessEnabled;
     public final ModConfigSpec.BooleanValue battleSwitchEffectivenessEnabled;
     public final ModConfigSpec.BooleanValue battleSwitchChatNotification;
+    public final ModConfigSpec.BooleanValue battleShowAttackDamage;
+    public final ModConfigSpec.BooleanValue battleHighlightBestAttack;
+    public final ModConfigSpec.BooleanValue battleShowAttackTooltip;
 
     public final ModConfigSpec.BooleanValue radarEnabled;
     public final ModConfigSpec.BooleanValue radarHudEnabled;
@@ -99,6 +102,21 @@ public class EffectivenessConfig {
             .comment("Писать в чат самого эффективного покемона при открытии меню смены покемона.",
                      "Send chat message about most effective Pokemon when opening battle switch menu.")
             .define("battleSwitchChatNotification", true);
+
+        battleShowAttackDamage = builder
+            .comment("Показывать расчетный урон атак и % здоровья противника прямо на кнопках выбора атак в бою.",
+                     "Show estimated damage and enemy HP% directly on move selection buttons in battle.")
+            .define("battleShowAttackDamage", true);
+
+        battleHighlightBestAttack = builder
+            .comment("Выделять самую эффективную атаку золотой рамкой, значком ★ ТОП и звездочкой.",
+                     "Highlight the most effective attack with a golden frame, ★ TOP badge and star.")
+            .define("battleHighlightBestAttack", true);
+
+        battleShowAttackTooltip = builder
+            .comment("Показывать подробный тултип с уроном, STAB, множителями и силой атаки при наведении на кнопку атаки.",
+                     "Show detailed tooltip with damage, STAB, multipliers, and power when hovering over a move button.")
+            .define("battleShowAttackTooltip", true);
 
         builder.pop();
 

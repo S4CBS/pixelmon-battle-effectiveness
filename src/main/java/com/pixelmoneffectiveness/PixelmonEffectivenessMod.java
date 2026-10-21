@@ -2,6 +2,7 @@ package com.pixelmoneffectiveness;
 
 import com.pixelmoneffectiveness.config.EffectivenessConfig;
 import com.pixelmoneffectiveness.client.autofarm.MintAutoFarmClient;
+import com.pixelmoneffectiveness.client.battle.BattleMoveOverlayClient;
 import com.pixelmoneffectiveness.client.battle.BattleSwitchOverlayClient;
 import com.pixelmoneffectiveness.client.overlay.PokemonOverlayClient;
 import com.pixelmoneffectiveness.client.radar.PokeLootRadarClient;
@@ -43,6 +44,7 @@ public class PixelmonEffectivenessMod {
             MintAutoFarmClient.init(modEventBus);
             BattleSwitchOverlayClient.init(modEventBus);
             RaidMenuOverlayClient.init(modEventBus);
+            BattleMoveOverlayClient.init(modEventBus);
         }
     }
 }

@@ -1,11 +1,15 @@
 package com.pixelmoneffectiveness.mixin;
 
+import com.pixelmoneffectiveness.client.battle.BattleMoveOverlayClient;
 import com.pixelmoneffectiveness.util.PixelmonEffectivenessHelper;
+import com.pixelmonmod.pixelmon.api.battles.AttackCategory;
 import com.pixelmonmod.pixelmon.api.pokemon.type.Type;
 import com.pixelmonmod.pixelmon.battles.attacks.Attack;
 import com.pixelmonmod.pixelmon.battles.attacks.Effectiveness;
 import com.pixelmonmod.pixelmon.client.gui.battles.ClientBattleManager;
 import com.pixelmonmod.pixelmon.client.gui.battles.PixelmonClientData;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
 import net.minecraft.core.Holder;
 import net.minecraft.network.chat.Component;
 import org.spongepowered.asm.mixin.Mixin;
@@ -13,6 +17,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.List;
@@ -25,13 +30,11 @@ public abstract class ChooseAttackMoveButtonMixin {
 
     /**
      * Bypasses the Pokedex hasCaught check and single-opponent check,
-     * allowing type effectiveness to be shown in every battle.
+     * allowing type effectiveness and damage estimation to be shown in every battle.
      */
     @Inject(method = "shouldRenderTypeEffectiveness", at = @At("HEAD"), cancellable = true)
     private void pixelmonEffectiveness$shouldRenderTypeEffectiveness(CallbackInfoReturnable<Boolean> cir) {
-        if (PixelmonEffectivenessHelper.shouldShowEffectiveness(this.attack)) {
-            cir.setReturnValue(true);
-        }
+        cir.setReturnValue(true);
     }
 
     /**
@@ -69,7 +72,25 @@ public abstract class ChooseAttackMoveButtonMixin {
     }
 
     /**
-     * Formats the displayed effectiveness text with clear language and exact multiplier (e.g. 2x, 4x, 0.5x).
+     * Redirects Effectiveness.findNearest so status moves (like Stealth Rock) don't get
+     * misleading super-effective green circles when they deal 0 damage.
+     */
+    @Redirect(
+        method = "renderAttackPPAndType",
+        at = @At(
+            value = "INVOKE",
+            target = "Lcom/pixelmonmod/pixelmon/battles/attacks/Effectiveness;findNearest(D)Lcom/pixelmonmod/pixelmon/battles/attacks/Effectiveness;"
+        )
+    )
+    private Effectiveness pixelmonEffectiveness$findNearest(double multiplier) {
+        if (this.attack != null && this.attack.getAttackCategory() == AttackCategory.STATUS) {
+            return Effectiveness.NONE;
+        }
+        return Effectiveness.findNearest(multiplier);
+    }
+
+    /**
+     * Formats the displayed effectiveness text with exact damage, HP%, and highlights the top move.
      */
     @Redirect(
         method = "renderAttackPPAndType",
@@ -79,6 +100,15 @@ public abstract class ChooseAttackMoveButtonMixin {
         )
     )
     private Component pixelmonEffectiveness$formatDisplayName(Effectiveness eff) {
-        return PixelmonEffectivenessHelper.formatDisplayName(eff, this.attack);
+        return BattleMoveOverlayClient.getButtonDisplayName(eff, this.attack);
+    }
+
+    /**
+     * Renders visual highlights (golden outline, TOP badge) on the most effective move button,
+     * and prepares hover tooltips.
+     */
+    @Inject(method = "renderWidget", at = @At("TAIL"))
+    private void pixelmonEffectiveness$onRenderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks, CallbackInfo ci) {
+        BattleMoveOverlayClient.onRenderMoveButton(graphics, (Button) (Object) this, this.attack, mouseX, mouseY);
     }
 }
