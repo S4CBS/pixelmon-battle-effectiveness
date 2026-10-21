@@ -28,6 +28,7 @@ import com.pixelmonmod.pixelmon.comm.packetHandlers.storage.ServerboundSetSelect
 import com.pixelmonmod.pixelmon.entities.pixelmon.PixelmonEntity;
 import com.pixelmonmod.pixelmon.entities.pokeballs.OccupiedPokeBallEntity;
 import com.pixelmonmod.pixelmon.entities.pokeballs.PokeBallEntity;
+import com.pixelmoneffectiveness.client.autofarm.loot.ForageBlockRegistry;
 import com.pixelmoneffectiveness.client.autofarm.loot.ForageLootRegistry;
 import com.pixelmoneffectiveness.client.autofarm.loot.ForageLootScreen;
 import com.pixelmoneffectiveness.config.EffectivenessConfig;
@@ -757,51 +758,7 @@ public class MintAutoFarmClient {
     }
 
     public static int getBlockScore(BlockState state, BlockPos pos, BlockPos playerPos, ClientLevel level) {
-        Block b = state.getBlock();
-        ResourceLocation id = BuiltInRegistries.BLOCK.getKey(b);
-        if (id == null) return 20;
-        String path = id.getPath().toLowerCase(Locale.ROOT);
-
-        int score = 30;
-        boolean mintFarming = isFarmingMints();
-
-        if (mintFarming) {
-            // Moss blocks (Highest priority for mint)
-            if (b == Blocks.MOSS_BLOCK || path.equals("moss_block")) {
-                score = 100;
-            } else if (b == Blocks.MOSS_CARPET || path.contains("moss")) {
-                score = 90;
-            } else if (b == Blocks.PODZOL || b == Blocks.MYCELIUM) {
-                score = 75;
-            } else if (b == Blocks.GRASS_BLOCK || path.contains("grass_block")) {
-                score = 60;
-            } else if (b == Blocks.MUD || b == Blocks.ROOTED_DIRT || path.contains("mud") || path.contains("rooted")) {
-                score = 45;
-            } else if (b == Blocks.DIRT || b == Blocks.COARSE_DIRT || path.contains("dirt") || state.is(BlockTags.DIRT)) {
-                score = 35;
-            } else if (path.contains("sand")) {
-                score = 30;
-            } else {
-                score = 25;
-            }
-
-            // Small bonus for sky visibility when farming mints
-            if (level != null && pos != null && level.canSeeSky(pos.above())) {
-                score += 5;
-            }
-        } else {
-            // Non-mint farming (bones, stones, treasures, mc loot): all solid blocks are great!
-            score = 50;
-        }
-
-        // Strong bonus if this block is right under player's feet (dx=0, dz=0, dy=-1)
-        if (playerPos != null && pos != null) {
-            if (pos.getX() == playerPos.getX() && pos.getZ() == playerPos.getZ() && pos.getY() == playerPos.getY() - 1) {
-                score += 20;
-            }
-        }
-
-        return score;
+        return ForageBlockRegistry.getBlockScore(state, pos, playerPos, level, isFarmingMints());
     }
 
     public static BlockPos findBestForageBlock(Minecraft mc) {
@@ -820,7 +777,7 @@ public class MintAutoFarmClient {
                     if (!isValidForageBlock(mc.level, pos)) continue;
 
                     int score = getBlockScore(mc.level.getBlockState(pos), pos, playerPos, mc.level);
-                    if (score < 0) continue;
+                    if (score <= 0) continue;
 
                     double distSq = pos.distSqr(playerPos);
 
@@ -836,25 +793,7 @@ public class MintAutoFarmClient {
     }
 
     public static boolean isValidForageBlock(ClientLevel level, BlockPos pos) {
-        if (level == null || pos == null) return false;
-        BlockState state = level.getBlockState(pos);
-        if (state.isAir()) return false;
-
-        // Block must be solid / support standing or foraging
-        if (!state.isSolid() && !state.blocksMotion()) {
-            return false;
-        }
-
-        // Fluid check (cannot forage on open water or lava)
-        if (!state.getFluidState().isEmpty()) {
-            return false;
-        }
-
-        BlockPos above = pos.above();
-        BlockState aboveState = level.getBlockState(above);
-
-        // Block above must allow entity/drop to exist (air, grass, flower, carpet, etc.)
-        return !aboveState.isSolid() || aboveState.canBeReplaced() || aboveState.is(Blocks.MOSS_CARPET);
+        return ForageBlockRegistry.isValidForageBlock(level, pos);
     }
 
     public static boolean isBiomeAridForMint(ClientLevel level, BlockPos pos) {
