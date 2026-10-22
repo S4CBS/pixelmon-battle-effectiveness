@@ -13,8 +13,8 @@ import java.util.List;
 
 public class PokemonFreezeDespawnHandler {
 
-    public static final double DESPAWN_DISTANCE_CHUNKS = 50.0;
-    public static final double DESPAWN_DISTANCE_BLOCKS = DESPAWN_DISTANCE_CHUNKS * 16.0; // 800 blocks
+    public static final double DESPAWN_DISTANCE_CHUNKS = 62.5;
+    public static final double DESPAWN_DISTANCE_BLOCKS = 1000.0; // 1000 blocks
     public static final double DESPAWN_DISTANCE_SQ = DESPAWN_DISTANCE_BLOCKS * DESPAWN_DISTANCE_BLOCKS;
 
     public static final double FREEZE_DISTANCE_BLOCKS = 32.0; // 2 chunks

@@ -7,10 +7,13 @@ import com.pixelmoneffectiveness.client.battle.BattleSwitchOverlayClient;
 import com.pixelmoneffectiveness.client.overlay.PokemonOverlayClient;
 import com.pixelmoneffectiveness.client.radar.PokeLootRadarClient;
 import com.pixelmoneffectiveness.client.raid.RaidMenuOverlayClient;
+import com.pixelmoneffectiveness.command.NightVisionCommand;
 import com.pixelmoneffectiveness.handler.ApricornTreeHarvestHandler;
 import com.pixelmoneffectiveness.handler.DittoDisguiseHandler;
 import com.pixelmoneffectiveness.handler.PokemonFreezeDespawnHandler;
+import com.pixelmoneffectiveness.handler.UltraSpaceFlightHandler;
 import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
@@ -32,6 +35,16 @@ public class PixelmonEffectivenessMod {
         NeoForge.EVENT_BUS.addListener(PokemonFreezeDespawnHandler::onEntityJoinLevel);
         NeoForge.EVENT_BUS.addListener(PokemonFreezeDespawnHandler::onEntityTick);
         NeoForge.EVENT_BUS.addListener(DittoDisguiseHandler::onEntityJoinLevel);
+
+        // Commands and persistent effects
+        NeoForge.EVENT_BUS.addListener(NightVisionCommand::onRegisterCommands);
+        NeoForge.EVENT_BUS.addListener(NightVisionCommand::onPlayerRespawn);
+        NeoForge.EVENT_BUS.addListener(NightVisionCommand::onPlayerChangedDimension);
+        NeoForge.EVENT_BUS.addListener(NightVisionCommand::onPlayerLoggedIn);
+
+        // Ultra Space flight upward pull fix (counteracts Pixelmon's +0.07d/tick upward acceleration during flight)
+        NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, UltraSpaceFlightHandler::onEntityTickPost);
+
         try {
             com.pixelmonmod.pixelmon.Pixelmon.EVENT_BUS.addListener(DittoDisguiseHandler::onSuccessfulCapture);
         } catch (Throwable t) {
