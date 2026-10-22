@@ -39,8 +39,6 @@ public class EffectivenessConfig {
     public final ModConfigSpec.BooleanValue pokemonRadarEnabled;
     public final ModConfigSpec.ConfigValue<String> pokemonSearchFilter;
     public final ModConfigSpec.BooleanValue pokemonShowRareWithoutFilter;
-    public final ModConfigSpec.BooleanValue pokemonRadarTrackDitto;
-    public final ModConfigSpec.DoubleValue dittoDisguiseChance;
 
     public final ModConfigSpec.BooleanValue overlayEnabled;
     public final ModConfigSpec.BooleanValue overlayAlwaysExpanded;
@@ -90,7 +88,6 @@ public class EffectivenessConfig {
     public final ModConfigSpec.BooleanValue telegramNotifyBeastLoot;
     public final ModConfigSpec.BooleanValue telegramNotifyUltraLoot;
     public final ModConfigSpec.BooleanValue telegramNotifyLegendaryStop;
-    public final ModConfigSpec.BooleanValue telegramNotifyDitto;
     public final ModConfigSpec.BooleanValue telegramNotifyPlayerDeath;
     public final ModConfigSpec.ConfigValue<String> telegramPokemonFilter;
 
@@ -250,16 +247,6 @@ public class EffectivenessConfig {
             .comment("Отображать редких покемонов (Шайни, Легендарные, Боссы), если строка поиска пуста.",
                      "Show rare pokemon (Shiny, Legendary, Boss) when search filter is empty.")
             .define("pokemonShowRareWithoutFilter", true);
-
-        pokemonRadarTrackDitto = builder
-            .comment("Отслеживать и выделять Дитто (включая замаскированных) на покерадаре.",
-                     "Track and highlight Dittos (including disguised ones) on the PokéRadar.")
-            .define("pokemonRadarTrackDitto", true);
-
-        dittoDisguiseChance = builder
-            .comment("Шанс появления замаскированного Дитто среди видов-кандидатов (от 0.0 до 1.0). По умолчанию -1.0 (использовать настройку Pixelmon transformToDittoOnCatch).",
-                     "Chance for a candidate wild Pokemon to be a disguised Ditto (0.0 to 1.0). Default -1.0 (use Pixelmon's transformToDittoOnCatch).")
-            .defineInRange("dittoDisguiseChance", -1.0, -1.0, 1.0);
 
         builder.pop();
 
@@ -499,11 +486,6 @@ public class EffectivenessConfig {
             .comment("Уведомлять при обнаружении Легендарного ПокеСтопа.",
                      "Notify when a Legendary PokéStop is found.")
             .define("notifyLegendaryStop", true);
-
-        telegramNotifyDitto = builder
-            .comment("Уведомлять при обнаружении замаскированного Дитто.",
-                     "Notify when a disguised Ditto is found.")
-            .define("notifyDitto", false);
 
         telegramNotifyPlayerDeath = builder
             .comment("Уведомлять при смерти игрока с точными координатами.",

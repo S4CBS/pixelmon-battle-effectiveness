@@ -9,7 +9,6 @@ import com.pixelmonmod.pixelmon.battles.raids.data.RaidData;
 import com.pixelmonmod.pixelmon.client.storage.ClientStorageManager;
 import com.pixelmonmod.pixelmon.entities.DenEntity;
 import com.pixelmonmod.pixelmon.entities.pixelmon.PixelmonEntity;
-import com.pixelmoneffectiveness.client.radar.DittoDisguiseHelper;
 import com.pixelmoneffectiveness.client.radar.PokeLootTier;
 import com.pixelmoneffectiveness.client.radar.PokeStopTier;
 import net.minecraft.client.Minecraft;
@@ -168,7 +167,6 @@ public class TelegramEventWatcher {
             isBoss = true;
         }
 
-        boolean isConfirmedDitto = DittoDisguiseHelper.isConfirmedDitto(pixelmon);
         String speciesName = (pokemon.getSpecies() != null) ? pokemon.getSpecies().getName() : "";
         boolean isCustomTracked = TelegramBotClient.isPokemonTracked(speciesName);
 
@@ -194,9 +192,6 @@ public class TelegramEventWatcher {
         } else if (isBoss && TelegramEventType.ALL_BOSS.isEnabled()) {
             notify = true;
             eventHeader = "⚔️ <b>[Pixelmon] Спавн Босса!</b>";
-        } else if (isConfirmedDitto && TelegramEventType.DITTO.isEnabled()) {
-            notify = true;
-            eventHeader = "🎭 <b>[Pixelmon] Обнаружен замаскированный Дитто!</b>";
         } else if (isCustomTracked) {
             notify = true;
             eventHeader = "🎯 <b>[Pixelmon] Спавн отслеживаемого покемона!</b>";
@@ -224,9 +219,6 @@ public class TelegramEventWatcher {
 
         if (isBoss && !bossTierTitle.isEmpty()) {
             sb.append("▫️ <b>Ранг босса:</b> ").append(TelegramBotClient.escapeHtml(bossTierTitle)).append("\n");
-        }
-        if (isConfirmedDitto) {
-            sb.append("▫️ <b>Маскировка:</b> Замаскирован под ").append(pokeNameStr).append("\n");
         }
 
         BlockPos pos = pixelmon.blockPosition();

@@ -11,7 +11,6 @@ import com.pixelmoneffectiveness.client.render.PokemonDespawnDebugRenderer;
 import com.pixelmoneffectiveness.command.NbtPixelmonDebugCommand;
 import com.pixelmoneffectiveness.command.NightVisionCommand;
 import com.pixelmoneffectiveness.handler.ApricornTreeHarvestHandler;
-import com.pixelmoneffectiveness.handler.DittoDisguiseHandler;
 import com.pixelmoneffectiveness.handler.PokemonFreezeDespawnHandler;
 import com.pixelmoneffectiveness.handler.PokemonSpawnCapReliefHandler;
 import com.pixelmoneffectiveness.handler.UltraSpaceFlightHandler;
@@ -38,7 +37,6 @@ public class PixelmonEffectivenessMod {
         NeoForge.EVENT_BUS.addListener(PokemonFreezeDespawnHandler::onEntityJoinLevel);
         NeoForge.EVENT_BUS.addListener(PokemonFreezeDespawnHandler::onEntityTick);
         NeoForge.EVENT_BUS.addListener(PokemonSpawnCapReliefHandler::onServerTick);
-        NeoForge.EVENT_BUS.addListener(DittoDisguiseHandler::onEntityJoinLevel);
 
         // Commands and persistent effects
         NeoForge.EVENT_BUS.addListener(NightVisionCommand::onRegisterCommands);
@@ -54,12 +52,6 @@ public class PixelmonEffectivenessMod {
 
         // Ultra Space flight upward pull fix (counteracts Pixelmon's +0.07d/tick upward acceleration during flight)
         NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, UltraSpaceFlightHandler::onEntityTickPost);
-
-        try {
-            com.pixelmonmod.pixelmon.Pixelmon.EVENT_BUS.addListener(DittoDisguiseHandler::onSuccessfulCapture);
-        } catch (Throwable t) {
-            LOGGER.warn("Failed to register Pixelmon capture listener for Ditto", t);
-        }
 
         if (FMLEnvironment.dist == Dist.CLIENT) {
             PokeLootRadarClient.init(modEventBus);

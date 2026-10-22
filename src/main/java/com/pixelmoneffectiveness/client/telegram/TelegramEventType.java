@@ -30,7 +30,6 @@ public enum TelegramEventType {
     BEAST_LOOT("beast_loot", "🟡 Beast Ball PokéLoot", "🟡 Beast Ball PokéLoot", "Обнаружение сундука Бистбол", "Beast Ball chest discovered"),
     ULTRA_LOOT("ultra_loot", "🔵 Ultra Ball PokéLoot", "🔵 Ultra Ball PokéLoot", "Обнаружение сундука Ультрабол", "Ultra Ball chest discovered"),
     LEGENDARY_POKESTOP("legendary_pokestop", "🏛️ Легендарный ПокеСтоп", "🏛️ Legendary PokéStop", "Обнаружение легендарного ПокеСтопа", "Legendary PokéStop discovered"),
-    DITTO("ditto", "🎭 Замаскированный Дитто", "🎭 Disguised Ditto", "Обнаружение замаскированного Дитто", "Disguised Ditto discovered"),
     PLAYER_DEATH("player_death", "💀 Смерть игрока", "💀 Player Death", "Точные координаты и измерение гибели игрока", "Exact coordinates and dimension where player died");
 
     public final String id;
@@ -112,7 +111,6 @@ public enum TelegramEventType {
             case BEAST_LOOT -> EffectivenessConfig.CONFIG.telegramNotifyBeastLoot.get();
             case ULTRA_LOOT -> EffectivenessConfig.CONFIG.telegramNotifyUltraLoot.get();
             case LEGENDARY_POKESTOP -> EffectivenessConfig.CONFIG.telegramNotifyLegendaryStop.get();
-            case DITTO -> EffectivenessConfig.CONFIG.telegramNotifyDitto.get();
             case PLAYER_DEATH -> EffectivenessConfig.CONFIG.telegramNotifyPlayerDeath.get();
         };
     }
@@ -147,7 +145,6 @@ public enum TelegramEventType {
             case BEAST_LOOT -> EffectivenessConfig.CONFIG.telegramNotifyBeastLoot.set(enabled);
             case ULTRA_LOOT -> EffectivenessConfig.CONFIG.telegramNotifyUltraLoot.set(enabled);
             case LEGENDARY_POKESTOP -> EffectivenessConfig.CONFIG.telegramNotifyLegendaryStop.set(enabled);
-            case DITTO -> EffectivenessConfig.CONFIG.telegramNotifyDitto.set(enabled);
             case PLAYER_DEATH -> EffectivenessConfig.CONFIG.telegramNotifyPlayerDeath.set(enabled);
         }
         EffectivenessConfig.SPEC.save();
