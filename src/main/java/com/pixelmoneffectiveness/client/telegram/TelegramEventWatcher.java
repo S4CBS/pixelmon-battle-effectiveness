@@ -2,13 +2,17 @@ package com.pixelmoneffectiveness.client.telegram;
 
 import com.pixelmonmod.pixelmon.api.pokemon.Pokemon;
 import com.pixelmonmod.pixelmon.api.pokemon.boss.BossTier;
+import com.pixelmonmod.pixelmon.api.storage.PlayerPartyStorage;
+import com.pixelmonmod.pixelmon.api.storage.StorageProxy;
 import com.pixelmonmod.pixelmon.battles.raids.RaidType;
 import com.pixelmonmod.pixelmon.battles.raids.data.RaidData;
+import com.pixelmonmod.pixelmon.client.storage.ClientStorageManager;
 import com.pixelmonmod.pixelmon.entities.DenEntity;
 import com.pixelmonmod.pixelmon.entities.pixelmon.PixelmonEntity;
 import com.pixelmoneffectiveness.client.radar.DittoDisguiseHelper;
 import com.pixelmoneffectiveness.client.radar.PokeLootTier;
 import com.pixelmoneffectiveness.client.radar.PokeStopTier;
+import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
@@ -18,6 +22,7 @@ import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 
 import java.util.Optional;
+import java.util.UUID;
 
 public class TelegramEventWatcher {
 
@@ -35,8 +40,90 @@ public class TelegramEventWatcher {
         }
     }
 
+    public static boolean isWildPokemon(PixelmonEntity pixelmon) {
+        if (pixelmon == null || !pixelmon.isAlive()) {
+            return false;
+        }
+
+        // 1. Direct entity checks
+        try {
+            if (pixelmon.hasOwner() || pixelmon.getOwnerUUID() != null || pixelmon.getOwner() != null) {
+                return false;
+            }
+            if (pixelmon.isTamed()) {
+                return false;
+            }
+            if (pixelmon.getPlayerParty() != null) {
+                return false;
+            }
+            if (pixelmon.getPlayerStorage() != null && pixelmon.getPlayerStorage().isPresent()) {
+                return false;
+            }
+        } catch (Throwable ignored) {}
+
+        Pokemon pokemon = pixelmon.getPokemon();
+        if (pokemon == null) {
+            return false;
+        }
+
+        // 2. Pokemon data ownership checks (Trainer / Owner / Storage)
+        try {
+            if (pokemon.getOwnerPlayerUUID() != null) {
+                return false;
+            }
+            if (pokemon.getOriginalTrainerUUID() != null) {
+                return false;
+            }
+            String otName = pokemon.getOriginalTrainer();
+            if (otName != null && !otName.trim().isEmpty()) {
+                return false;
+            }
+            if (pokemon.getStorage() != null) {
+                return false;
+            }
+        } catch (Throwable ignored) {}
+
+        // 3. Local player checks (party & belongsTo)
+        try {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.player != null) {
+                if (pixelmon.belongsTo(mc.player)) {
+                    return false;
+                }
+                UUID myUuid = mc.player.getUUID();
+                if (myUuid != null) {
+                    if (myUuid.equals(pokemon.getOwnerPlayerUUID()) || myUuid.equals(pokemon.getOriginalTrainerUUID())) {
+                        return false;
+                    }
+                }
+                PlayerPartyStorage party = StorageProxy.getPartyNow(mc.player);
+                if (party == null) {
+                    party = ClientStorageManager.party();
+                }
+                if (party != null) {
+                    UUID pokeUuid = pokemon.getUUID();
+                    if (pokeUuid != null) {
+                        if (party.get(pokeUuid) != null || party.getSlot(pokeUuid) >= 0) {
+                            return false;
+                        }
+                    }
+                    Pokemon[] all = party.getAll();
+                    if (all != null) {
+                        for (Pokemon p : all) {
+                            if (p != null && (p == pokemon || (pokeUuid != null && pokeUuid.equals(p.getUUID())))) {
+                                return false;
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+
+        return true;
+    }
+
     public static void handlePixelmonSpawn(PixelmonEntity pixelmon, Level level) {
-        if (pixelmon == null || !pixelmon.isAlive() || pixelmon.getOwner() != null) {
+        if (!isWildPokemon(pixelmon)) {
             return; // Wild alive only
         }
 

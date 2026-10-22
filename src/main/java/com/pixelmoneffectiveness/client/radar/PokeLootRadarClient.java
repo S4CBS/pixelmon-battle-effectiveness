@@ -373,7 +373,7 @@ public class PokeLootRadarClient {
 
             for (Entity entity : level.entitiesForRendering()) {
                 if (entity instanceof PixelmonEntity pixelmon && pixelmon.isAlive()) {
-                    if (pixelmon.getOwner() != null) {
+                    if (!com.pixelmoneffectiveness.client.telegram.TelegramEventWatcher.isWildPokemon(pixelmon)) {
                         continue; // Wild only
                     }
 
