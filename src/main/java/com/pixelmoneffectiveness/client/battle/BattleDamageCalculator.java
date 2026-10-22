@@ -1,6 +1,5 @@
 package com.pixelmoneffectiveness.client.battle;
 
-import com.pixelmoneffectiveness.config.EffectivenessConfig;
 import com.pixelmoneffectiveness.util.PixelmonEffectivenessHelper;
 import com.pixelmonmod.pixelmon.api.battles.AttackCategory;
 import com.pixelmonmod.pixelmon.api.context.ContextKeys;
@@ -11,6 +10,7 @@ import com.pixelmonmod.pixelmon.api.pokemon.type.Type;
 import com.pixelmonmod.pixelmon.api.storage.StorageProxy;
 import com.pixelmonmod.pixelmon.battles.attacks.Attack;
 import com.pixelmonmod.pixelmon.battles.attacks.ImmutableAttack;
+import com.pixelmonmod.pixelmon.battles.status.StatusType;
 import com.pixelmonmod.pixelmon.client.ClientProxy;
 import com.pixelmonmod.pixelmon.client.gui.battles.ClientBattleManager;
 import com.pixelmonmod.pixelmon.client.gui.battles.PixelmonClientData;
@@ -26,6 +26,13 @@ import java.util.UUID;
 /**
  * Calculates estimated damage, HP percentages, and determines the most effective attack
  * for the player's active Pokemon against the active opponent in battle.
+ * Accounts in real time for:
+ * - Terastallization & active type overrides
+ * - Tera Raid shields & Max Raid shields
+ * - Weather & Terrain damage multipliers
+ * - Attacker status ailments (Burn halves physical attack)
+ * - Ability immunities & special move matchups
+ * - Dynamic state-hash cache invalidation
  */
 public class BattleDamageCalculator {
 
@@ -40,6 +47,13 @@ public class BattleDamageCalculator {
         public final double stab;
         public final boolean isStatus;
         public final boolean isImmune;
+        public final String immunityReason;
+        public final String enemyTeraTypeName;
+        public final int shields;
+        public final int maxShields;
+        public final String weatherName;
+        public final String terrainName;
+        public final boolean isAttackerBurned;
         public final int damageMin;
         public final int damageMax;
         public final int damageAvg;
@@ -61,6 +75,13 @@ public class BattleDamageCalculator {
             double stab,
             boolean isStatus,
             boolean isImmune,
+            String immunityReason,
+            String enemyTeraTypeName,
+            int shields,
+            int maxShields,
+            String weatherName,
+            String terrainName,
+            boolean isAttackerBurned,
             int damageMin,
             int damageMax,
             int damageAvg,
@@ -81,6 +102,13 @@ public class BattleDamageCalculator {
             this.stab = stab;
             this.isStatus = isStatus;
             this.isImmune = isImmune;
+            this.immunityReason = immunityReason;
+            this.enemyTeraTypeName = enemyTeraTypeName;
+            this.shields = shields;
+            this.maxShields = maxShields;
+            this.weatherName = weatherName;
+            this.terrainName = terrainName;
+            this.isAttackerBurned = isAttackerBurned;
             this.damageMin = damageMin;
             this.damageMax = damageMax;
             this.damageAvg = damageAvg;
@@ -101,18 +129,41 @@ public class BattleDamageCalculator {
 
             lines.add(Component.literal("§f" + moveName + " §7(" + categoryName + " • " + typeName + ")"));
 
+            if (enemyTeraTypeName != null && !enemyTeraTypeName.isEmpty()) {
+                lines.add(Component.literal("§d✦ Тера-тип цели: §f" + enemyTeraTypeName + " §7(заменяет базовые типы!)"));
+            }
+
+            if (shields > 0) {
+                lines.add(Component.literal("§5🛡 Щит рейда: §e" + shields + "/" + maxShields + " §7(урон снижен до 20% без Терастала)"));
+            }
+
+            if (weatherName != null) {
+                lines.add(Component.literal("§e☀️ Погода: §f" + weatherName));
+            }
+
+            if (terrainName != null) {
+                lines.add(Component.literal("§b⚡ Поле боя: §f" + terrainName));
+            }
+
+            if (isAttackerBurned) {
+                lines.add(Component.literal("§c🔥 Ожог: §7физический урон снижен на 50%"));
+            }
+
             if (isStatus) {
                 lines.add(Component.literal("§7Категория: §eСтатусная (без прямого урона)"));
                 lines.add(Component.literal("§7Точность: §f" + (accuracy > 0 ? accuracy + "%" : "—") +
                     " §7| PP: §f" + attack.getPP() + "/" + attack.getMaxPP()));
-                if (effectiveness == 0.0) {
-                    lines.add(Component.literal("§cЦель невосприимчива к статусу этого типа (0x)!"));
+                if (isImmune || effectiveness == 0.0) {
+                    lines.add(Component.literal("§cЦель невосприимчива: " + (immunityReason != null ? immunityReason : "0x") + "!"));
                 }
                 return lines;
             }
 
             if (isImmune) {
-                lines.add(Component.literal("§cЦель невосприимчива к атаке (0x урон)!"));
+                lines.add(Component.literal("§c💥 НЕ ДЕЙСТВУЕТ (0x УРОН)!"));
+                if (immunityReason != null && !immunityReason.isEmpty()) {
+                    lines.add(Component.literal("§cПричина: §f" + immunityReason));
+                }
                 lines.add(Component.literal("§7Базовая сила: §f" + basePower +
                     " §7| Точность: §f" + (accuracy > 0 ? accuracy + "%" : "—") +
                     " §7| PP: §f" + attack.getPP() + "/" + attack.getMaxPP()));
@@ -154,10 +205,8 @@ public class BattleDamageCalculator {
         }
     }
 
-    // Cache to avoid recalculating within the same render tick
-    private static UUID cachedOurUUID = null;
-    private static UUID cachedEnemyUUID = null;
-    private static double cachedEnemyHp = -1;
+    // Dynamic state hash for real-time reactivity without stale caching
+    private static long cachedStateHash = Long.MIN_VALUE;
     private static Attack cachedTopAttack = null;
     private static final Map<Attack, BattleDamageResult> cache = new HashMap<>();
 
@@ -171,12 +220,10 @@ public class BattleDamageCalculator {
         PixelmonClientData activeEnemy = PixelmonEffectivenessHelper.getActiveEnemy(bm);
         if (activeOur == null || activeEnemy == null) return null;
 
-        double currentEnemyHp = (activeEnemy.health != null) ? activeEnemy.health.get() : activeEnemy.maxHealth;
-        boolean cacheValid = activeOur.pokemonUUID != null &&
-            activeOur.pokemonUUID.equals(cachedOurUUID) &&
-            activeEnemy.pokemonUUID != null &&
-            activeEnemy.pokemonUUID.equals(cachedEnemyUUID) &&
-            Math.abs(currentEnemyHp - cachedEnemyHp) < 0.01;
+        Pokemon partyPoke = getPartyPokemon(activeOur.pokemonUUID);
+        long currentStateHash = computeStateHash(activeOur, partyPoke, activeEnemy, bm);
+
+        boolean cacheValid = (currentStateHash == cachedStateHash);
 
         if (cacheValid && cache.containsKey(attack)) {
             return cache.get(attack);
@@ -184,11 +231,8 @@ public class BattleDamageCalculator {
 
         if (!cacheValid) {
             cache.clear();
-            cachedOurUUID = activeOur.pokemonUUID;
-            cachedEnemyUUID = activeEnemy.pokemonUUID;
-            cachedEnemyHp = currentEnemyHp;
+            cachedStateHash = currentStateHash;
 
-            Pokemon partyPoke = getPartyPokemon(activeOur.pokemonUUID);
             boolean inverse = bm.getOrDefault(ContextKeys.INVERSE_BATTLE, false);
             cachedTopAttack = findTopAttack(activeOur, partyPoke, activeEnemy, inverse);
 
@@ -208,11 +252,62 @@ public class BattleDamageCalculator {
         }
 
         // Fallback for single query
-        Pokemon partyPoke = getPartyPokemon(activeOur.pokemonUUID);
         boolean inverse = bm.getOrDefault(ContextKeys.INVERSE_BATTLE, false);
         BattleDamageResult res = calculateDamage(attack, activeOur, partyPoke, activeEnemy, inverse, cachedTopAttack);
         cache.put(attack, res);
         return res;
+    }
+
+    private static long computeStateHash(
+        PixelmonClientData activeOur,
+        Pokemon partyPoke,
+        PixelmonClientData activeEnemy,
+        ClientBattleManager bm
+    ) {
+        long h = 17;
+        if (activeOur != null) {
+            h = 31 * h + (activeOur.pokemonUUID != null ? activeOur.pokemonUUID.hashCode() : 0);
+            h = 31 * h + (activeOur.health != null ? Double.doubleToLongBits(activeOur.health.get()) : 0);
+            h = 31 * h + (activeOur.terastallize ? 1 : 0);
+            h = 31 * h + (activeOur.getTeraTypeColor() != null ? activeOur.getTeraTypeColor().getRGB() : 0);
+            h = 31 * h + activeOur.status;
+            h = 31 * h + (activeOur.form != null ? activeOur.form.hashCode() : 0);
+            if (activeOur.moveset != null) {
+                for (int i = 0; i < activeOur.moveset.size(); i++) {
+                    Attack a = activeOur.moveset.get(i);
+                    if (a != null) {
+                        h = 31 * h + a.getPP();
+                        h = 31 * h + (a.getDisabled() ? 1 : 0);
+                    }
+                }
+            }
+        }
+        if (partyPoke != null) {
+            h = 31 * h + (PixelmonEffectivenessHelper.isTerastallized(activeOur, partyPoke) ? 1 : 0);
+        }
+        if (activeEnemy != null) {
+            h = 31 * h + (activeEnemy.pokemonUUID != null ? activeEnemy.pokemonUUID.hashCode() : 0);
+            h = 31 * h + (activeEnemy.health != null ? Double.doubleToLongBits(activeEnemy.health.get()) : 0);
+            h = 31 * h + activeEnemy.shields;
+            h = 31 * h + activeEnemy.maxShields;
+            h = 31 * h + (activeEnemy.terastallize ? 1 : 0);
+            h = 31 * h + (activeEnemy.getTeraTypeColor() != null ? activeEnemy.getTeraTypeColor().getRGB() : 0);
+            h = 31 * h + activeEnemy.status;
+            h = 31 * h + (activeEnemy.form != null ? activeEnemy.form.hashCode() : 0);
+            List<Holder<Type>> enemyTypes = activeEnemy.getTypes();
+            if (enemyTypes != null) {
+                for (Holder<Type> t : enemyTypes) {
+                    h = 31 * h + (t != null && t.unwrapKey().isPresent() ? t.unwrapKey().get().hashCode() : 0);
+                }
+            }
+        }
+        if (bm != null) {
+            h = 31 * h + bm.battleTurn;
+            h = 31 * h + (bm.weather != null ? bm.weather.ordinal() : -1);
+            h = 31 * h + (bm.terrain != null ? bm.terrain.ordinal() : -1);
+            h = 31 * h + (bm.terastallize != null ? bm.terastallize.hashCode() : 0);
+        }
+        return h;
     }
 
     private static Pokemon getPartyPokemon(UUID uuid) {
@@ -247,6 +342,8 @@ public class BattleDamageCalculator {
             if (a.getAttackCategory() == AttackCategory.STATUS) continue;
 
             BattleDamageResult res = calculateDamage(a, activeOur, partyPoke, activeEnemy, inverse, null);
+            if (res == null || res.isImmune || res.effectiveness <= 0.0 || res.damageAvg <= 0) continue;
+
             if (res.damageAvg > maxAvgDmg) {
                 maxAvgDmg = res.damageAvg;
                 best = a;
@@ -280,16 +377,52 @@ public class BattleDamageCalculator {
         int basePower = move != null ? move.getBasePower() : 0;
         int accuracy = move != null ? move.getAccuracy() : 100;
 
+        List<Holder<Type>> enemyTypes = PixelmonEffectivenessHelper.getEffectiveDefenderTypes(enemy);
+        Holder<Type> enemyTeraHolder = PixelmonEffectivenessHelper.isTerastallized(enemy)
+            ? PixelmonEffectivenessHelper.resolveTeraType(enemy, null)
+            : null;
+        String enemyTeraTypeName = (enemyTeraHolder != null && enemyTeraHolder.value() != null)
+            ? enemyTeraHolder.value().name().getString()
+            : null;
+
         Type attackType = attack.getType() != null ? attack.getType().value() : null;
-        double eff = (attackType != null && enemy.getTypes() != null)
-            ? PixelmonEffectivenessHelper.calculateEffectiveness(attack, attackType, enemy.getTypes(), inverse)
+        double eff = (attackType != null && !enemyTypes.isEmpty())
+            ? PixelmonEffectivenessHelper.calculateEffectiveness(attack, attackType, enemyTypes, inverse, enemy)
             : 1.0;
 
-        // Status moves deal 0 damage
+        String immunityReason = (eff == 0.0)
+            ? PixelmonEffectivenessHelper.getImmunityReason(attack, attackType, enemyTypes, enemy)
+            : null;
+
+        int shields = enemy.shields;
+        int maxShields = enemy.maxShields;
+
+        ClientBattleManager bm = ClientProxy.battleManager;
+        StatusType weather = (bm != null) ? bm.weather : null;
+        StatusType terrain = (bm != null) ? bm.terrain : null;
+        String weatherName = formatWeatherName(weather);
+        String terrainName = formatTerrainName(terrain);
+
+        String moveId = (move != null && move.getRegistryKey() != null)
+            ? move.getRegistryKey().replace("pixelmon:", "").toLowerCase()
+            : "";
+
+        // Attacker Burn check (Burn halves physical attack damage unless Facade)
+        boolean isAttackerBurned = (partyPoke != null && partyPoke.getStatus() != null && partyPoke.getStatus().type == StatusType.Burn) ||
+                                   (clientPoke != null && clientPoke.status == StatusType.Burn.ordinal());
+
+        // Status moves handling
         if (cat == AttackCategory.STATUS) {
+            boolean statusBlockedByShield = (shields > 0);
+            boolean isImmuneStatus = (eff == 0.0) || statusBlockedByShield;
+            String statusReason = statusBlockedByShield
+                ? "Щит рейда полностью блокирует любые статусные атаки!"
+                : immunityReason;
+
             return new BattleDamageResult(
                 attack, moveName, categoryName, typeName, 0, accuracy, eff, 1.0,
-                true, eff == 0.0, 0, 0, 0, 0, 0, 0, false, false, false
+                true, isImmuneStatus, statusReason, enemyTeraTypeName, shields, maxShields,
+                weatherName, terrainName, false, 0, 0, 0, 0, 0, 0, false, false, false
             );
         }
 
@@ -316,11 +449,32 @@ public class BattleDamageCalculator {
         int enemyMaxHp = enemy.maxHealth > 0 ? enemy.maxHealth : estimateHp(enemyHpBase, enemyLevel);
         double enemyCurrentHp = (enemy.health != null && enemy.health.get() > 0) ? enemy.health.get() : enemyMaxHp;
 
-        // Check immunity
+        // Sandstorm boosts Rock-type Sp.Def by 50%
+        if (weather == StatusType.Sandstorm) {
+            for (Holder<Type> th : enemyTypes) {
+                if (th.is(Type.ROCK)) {
+                    enemySpDef = (int) Math.round(enemySpDef * 1.5);
+                    break;
+                }
+            }
+        }
+
+        // Snow boosts Ice-type Defense by 50%
+        if (weather == StatusType.Snow) {
+            for (Holder<Type> th : enemyTypes) {
+                if (th.is(Type.ICE)) {
+                    enemyDef = (int) Math.round(enemyDef * 1.5);
+                    break;
+                }
+            }
+        }
+
+        // Check immunity (0x effectiveness)
         if (eff == 0.0) {
             return new BattleDamageResult(
                 attack, moveName, categoryName, typeName, basePower, accuracy, 0.0, 1.0,
-                false, true, 0, 0, 0, 0, 0, 0, false, false, false
+                false, true, immunityReason, enemyTeraTypeName, shields, maxShields,
+                weatherName, terrainName, isAttackerBurned, 0, 0, 0, 0, 0, 0, false, false, false
             );
         }
 
@@ -328,12 +482,7 @@ public class BattleDamageCalculator {
         int aVal;
         int dVal;
 
-        String moveId = (move != null && move.getRegistryKey() != null)
-            ? move.getRegistryKey().replace("pixelmon:", "").toLowerCase()
-            : "";
-
         if (moveId.equals("photon_geyser")) {
-            // Photon Geyser compares Attack vs Sp.Attack
             if (atkStat > spAtkStat) {
                 aVal = atkStat;
                 dVal = enemyDef;
@@ -373,30 +522,102 @@ public class BattleDamageCalculator {
         } else if (moveId.equals("super_fang") || moveId.equals("natures_madness")) {
             dmgMin = dmgMax = Math.max(1, (int) (enemyCurrentHp / 2.0));
         } else {
-            // Variable power estimate fallback
             int effectivePower = basePower > 0 ? basePower : 60;
 
-            // STAB
-            boolean hasStab = false;
+            // STAB (Same-Type Attack Bonus) with Terastallization support
+            boolean isOurTera = PixelmonEffectivenessHelper.isTerastallized(clientPoke, partyPoke);
+            Holder<Type> ourTeraType = PixelmonEffectivenessHelper.resolveTeraType(clientPoke, partyPoke);
+
+            boolean hasOriginalStab = false;
             if (attackerTypes != null && attack.getType() != null) {
                 for (Holder<Type> t : attackerTypes) {
                     if (t != null && t.is(attack.getType().unwrapKey().orElse(null))) {
-                        hasStab = true;
+                        hasOriginalStab = true;
                         break;
                     }
                 }
             }
-            double stab = hasStab ? 1.5 : 1.0;
 
-            // Pokemon Gen 9 standard damage formula:
+            boolean hasTeraStab = (isOurTera && ourTeraType != null && attack.getType() != null &&
+                                   ourTeraType.is(attack.getType().unwrapKey().orElse(null)));
+
+            double stab;
+            if (isOurTera && ourTeraType != null) {
+                if (ourTeraType.is(Type.STELLAR)) {
+                    stab = hasOriginalStab ? 2.0 : 1.2;
+                } else if (hasOriginalStab && hasTeraStab) {
+                    stab = 2.0;
+                } else if (hasOriginalStab || hasTeraStab) {
+                    stab = 1.5;
+                } else {
+                    stab = 1.0;
+                }
+            } else {
+                stab = hasOriginalStab ? 1.5 : 1.0;
+            }
+
+            // Standard Damage Formula:
             // BaseDamage = ((((2 * Level / 5) + 2) * Power * A / D) / 50) + 2
             int levelFactor = (2 * attackerLevel) / 5 + 2;
             double statRatio = (double) aVal / Math.max(1, dVal);
             double baseDamage = Math.floor((Math.floor(levelFactor * effectivePower * statRatio) / 50.0)) + 2.0;
 
+            // Weather multipliers
+            if (weather == StatusType.Sunny) {
+                if (attack.getType() != null && attack.getType().is(Type.FIRE)) {
+                    baseDamage = Math.floor(baseDamage * 1.5);
+                } else if (attack.getType() != null && attack.getType().is(Type.WATER)) {
+                    baseDamage = Math.floor(baseDamage * 0.5);
+                }
+            } else if (weather == StatusType.Rainy) {
+                if (attack.getType() != null && attack.getType().is(Type.WATER)) {
+                    baseDamage = Math.floor(baseDamage * 1.5);
+                } else if (attack.getType() != null && attack.getType().is(Type.FIRE)) {
+                    baseDamage = Math.floor(baseDamage * 0.5);
+                }
+            }
+
+            // Terrain multipliers
+            if (terrain == StatusType.ElectricTerrain) {
+                if (attack.getType() != null && attack.getType().is(Type.ELECTRIC)) {
+                    baseDamage = Math.floor(baseDamage * 1.3);
+                }
+            } else if (terrain == StatusType.GrassyTerrain) {
+                if (attack.getType() != null && attack.getType().is(Type.GRASS)) {
+                    baseDamage = Math.floor(baseDamage * 1.3);
+                } else if (moveId.equals("earthquake") || moveId.equals("bulldoze") || moveId.equals("magnitude")) {
+                    baseDamage = Math.floor(baseDamage * 0.5);
+                }
+            } else if (terrain == StatusType.PsychicTerrain) {
+                if (attack.getType() != null && attack.getType().is(Type.PSYCHIC)) {
+                    baseDamage = Math.floor(baseDamage * 1.3);
+                }
+            } else if (terrain == StatusType.MistyTerrain) {
+                if (attack.getType() != null && attack.getType().is(Type.DRAGON)) {
+                    baseDamage = Math.floor(baseDamage * 0.5);
+                }
+            }
+
+            // Burn halves physical damage
+            if (isAttackerBurned && cat == AttackCategory.PHYSICAL && !moveId.equals("facade")) {
+                baseDamage = Math.floor(baseDamage * 0.5);
+            }
+
             double mod = stab * eff;
             dmgMin = Math.max(1, (int) Math.floor(baseDamage * mod * 0.85));
             dmgMax = Math.max(1, (int) Math.floor(baseDamage * mod * 1.00));
+
+            // Tera Raid Shield damage reduction
+            if (shields > 0) {
+                double shieldMod;
+                if (isOurTera) {
+                    shieldMod = hasTeraStab ? 0.75 : 0.35;
+                } else {
+                    shieldMod = 0.20;
+                }
+                dmgMin = Math.max(1, (int) Math.floor(dmgMin * shieldMod));
+                dmgMax = Math.max(1, (int) Math.floor(dmgMax * shieldMod));
+            }
         }
 
         int dmgAvg = (dmgMin + dmgMax) / 2;
@@ -409,7 +630,7 @@ public class BattleDamageCalculator {
         boolean isOneHitKO = (dmgMax >= enemyCurrentHp);
         boolean isTop = (topAttack != null && topAttack == attack);
 
-        // STAB calculation for result
+        // Final STAB display value
         boolean hasStabFinal = false;
         if (attackerTypes != null && attack.getType() != null) {
             for (Holder<Type> t : attackerTypes) {
@@ -423,9 +644,34 @@ public class BattleDamageCalculator {
 
         return new BattleDamageResult(
             attack, moveName, categoryName, typeName, basePower, accuracy, eff, stabVal,
-            false, false, dmgMin, dmgMax, dmgAvg, pctMin, pctMax, pctAvg,
+            false, false, null, enemyTeraTypeName, shields, maxShields,
+            weatherName, terrainName, isAttackerBurned,
+            dmgMin, dmgMax, dmgAvg, pctMin, pctMax, pctAvg,
             isOneHitKO, isGuaranteedKO, isTop
         );
+    }
+
+    private static String formatWeatherName(StatusType weather) {
+        if (weather == null || weather == StatusType.None) return null;
+        return switch (weather) {
+            case Sunny -> "Ясно / Солнце (+50% Огонь, -50% Вода)";
+            case Rainy -> "Дождь (+50% Вода, -50% Огонь)";
+            case Sandstorm -> "Песчаная буря (+50% Спец.Защита Камня)";
+            case Snow -> "Снегопад (+50% Защита Льда)";
+            case Hail -> "Град";
+            default -> weather.name();
+        };
+    }
+
+    private static String formatTerrainName(StatusType terrain) {
+        if (terrain == null || terrain == StatusType.None) return null;
+        return switch (terrain) {
+            case ElectricTerrain -> "Электрическое поле (+30% Электро, защита от сна)";
+            case GrassyTerrain -> "Травяное поле (+30% Трава, -50% Земля)";
+            case PsychicTerrain -> "Психическое поле (+30% Психо, защита от приоритета)";
+            case MistyTerrain -> "Туманное поле (-50% Дракон, защита от статусов)";
+            default -> terrain.name();
+        };
     }
 
     private static int estimateStat(int base, int level) {

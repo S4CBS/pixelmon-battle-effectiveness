@@ -18,6 +18,7 @@ import net.neoforged.neoforge.common.NeoForge;
  * Handles visual enhancement of move selection buttons in Pixelmon battles:
  * - Shows calculated damage and enemy HP% directly on the move button
  * - Highlights the most effective attack with a golden frame and a "★ ТОП" badge
+ * - Accounts for Raid Shields, Terastallization, Immunities, and Weather/Terrain
  * - Renders a detailed hover tooltip explaining damage breakdown, STAB, multipliers, and accuracy
  */
 public class BattleMoveOverlayClient {
@@ -41,7 +42,6 @@ public class BattleMoveOverlayClient {
         }
 
         if (!EffectivenessConfig.CONFIG.battleShowAttackDamage.get()) {
-            // If damage display is disabled, still fix status moves so they don't say 2x
             if (attack.getAttackCategory() == com.pixelmonmod.pixelmon.api.battles.AttackCategory.STATUS) {
                 return Component.literal("§7Статус (0)");
             }
@@ -54,6 +54,9 @@ public class BattleMoveOverlayClient {
         }
 
         if (res.isStatus) {
+            if (res.isImmune) {
+                return Component.literal("§c0x §7(Щит)");
+            }
             return Component.literal("§7Статус (0)");
         }
 
@@ -64,13 +67,14 @@ public class BattleMoveOverlayClient {
         String multStr = formatMultiplier(res.effectiveness);
         boolean highlightTop = EffectivenessConfig.CONFIG.battleHighlightBestAttack.get();
 
+        String shieldIndicator = (res.shields > 0) ? " §5🛡" : "";
         String dmgStr;
         if (res.isGuaranteedKO) {
-            dmgStr = "§e~" + res.damageAvg + " §c💥КО";
+            dmgStr = "§e~" + res.damageAvg + shieldIndicator + " §c💥КО";
         } else if (res.isOneHitKO) {
-            dmgStr = "§e~" + res.damageAvg + " §e💥~КО";
+            dmgStr = "§e~" + res.damageAvg + shieldIndicator + " §e💥~КО";
         } else {
-            dmgStr = "§e~" + res.damageAvg + " §7(" + res.percentAvg + "%)";
+            dmgStr = "§e~" + res.damageAvg + shieldIndicator + " §7(" + res.percentAvg + "%)";
         }
 
         if (res.isTop && highlightTop) {

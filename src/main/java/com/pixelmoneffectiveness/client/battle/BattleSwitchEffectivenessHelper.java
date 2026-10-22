@@ -42,7 +42,7 @@ public class BattleSwitchEffectivenessHelper {
         PixelmonClientData enemy = PixelmonEffectivenessHelper.getActiveEnemy(bm);
         if (enemy == null) return null;
 
-        List<Holder<Type>> enemyTypes = enemy.getTypes();
+        List<Holder<Type>> enemyTypes = PixelmonEffectivenessHelper.getEffectiveDefenderTypes(enemy);
         boolean inverse = bm.getOrDefault(ContextKeys.INVERSE_BATTLE, false);
 
         Minecraft mc = Minecraft.getInstance();

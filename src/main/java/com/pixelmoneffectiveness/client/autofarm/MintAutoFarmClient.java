@@ -895,7 +895,7 @@ public class MintAutoFarmClient {
         }
 
         PixelmonClientData enemy = PixelmonEffectivenessHelper.getActiveEnemy(bm);
-        List<Holder<Type>> enemyTypes = (enemy != null) ? enemy.getTypes() : null;
+        List<Holder<Type>> enemyTypes = (enemy != null) ? PixelmonEffectivenessHelper.getEffectiveDefenderTypes(enemy) : null;
         boolean inverse = bm.getOrDefault(ContextKeys.INVERSE_BATTLE, false);
 
         PixelmonClientData activeOur = bm.getCurrentPokemon();
