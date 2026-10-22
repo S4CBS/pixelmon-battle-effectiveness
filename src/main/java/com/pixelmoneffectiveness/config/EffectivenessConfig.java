@@ -72,8 +72,20 @@ public class EffectivenessConfig {
     public final ModConfigSpec.BooleanValue telegramNotifyLegendaryBoss;
     public final ModConfigSpec.BooleanValue telegramNotifyEpicBoss;
     public final ModConfigSpec.BooleanValue telegramNotifyBoss;
-    public final ModConfigSpec.BooleanValue telegramNotifyTeraRaid;
-    public final ModConfigSpec.BooleanValue telegramNotifyAllRaid;
+    public final ModConfigSpec.BooleanValue telegramNotifyTeraRaid1;
+    public final ModConfigSpec.BooleanValue telegramNotifyTeraRaid2;
+    public final ModConfigSpec.BooleanValue telegramNotifyTeraRaid3;
+    public final ModConfigSpec.BooleanValue telegramNotifyTeraRaid4;
+    public final ModConfigSpec.BooleanValue telegramNotifyTeraRaid5;
+    public final ModConfigSpec.BooleanValue telegramNotifyTeraRaid6;
+    public final ModConfigSpec.BooleanValue telegramNotifyTeraRaid7;
+    public final ModConfigSpec.BooleanValue telegramNotifyMaxRaid1;
+    public final ModConfigSpec.BooleanValue telegramNotifyMaxRaid2;
+    public final ModConfigSpec.BooleanValue telegramNotifyMaxRaid3;
+    public final ModConfigSpec.BooleanValue telegramNotifyMaxRaid4;
+    public final ModConfigSpec.BooleanValue telegramNotifyMaxRaid5;
+    public final ModConfigSpec.BooleanValue telegramNotifyMaxRaid6;
+    public final ModConfigSpec.BooleanValue telegramNotifyMaxRaid7;
     public final ModConfigSpec.BooleanValue telegramNotifyMasterLoot;
     public final ModConfigSpec.BooleanValue telegramNotifyBeastLoot;
     public final ModConfigSpec.BooleanValue telegramNotifyUltraLoot;
@@ -398,15 +410,75 @@ public class EffectivenessConfig {
                      "Notify when any other boss Pokémon spawns.")
             .define("notifyBoss", false);
 
-        telegramNotifyTeraRaid = builder
-            .comment("Уведомлять при обнаружении логова Тера-рейда (5★ - 7★).",
-                     "Notify when a high-tier Tera Raid den is found.")
-            .define("notifyTeraRaid", true);
+        telegramNotifyTeraRaid1 = builder
+            .comment("Уведомлять при обнаружении логова Тера-рейда 1★.",
+                     "Notify when a 1★ Tera Raid den is found.")
+            .define("notifyTeraRaid1", false);
 
-        telegramNotifyAllRaid = builder
-            .comment("Уведомлять при обнаружении любых рейдов.",
-             "Notify when any raid den is found.")
-            .define("notifyAllRaid", false);
+        telegramNotifyTeraRaid2 = builder
+            .comment("Уведомлять при обнаружении логова Тера-рейда 2★.",
+                     "Notify when a 2★ Tera Raid den is found.")
+            .define("notifyTeraRaid2", false);
+
+        telegramNotifyTeraRaid3 = builder
+            .comment("Уведомлять при обнаружении логова Тера-рейда 3★.",
+                     "Notify when a 3★ Tera Raid den is found.")
+            .define("notifyTeraRaid3", false);
+
+        telegramNotifyTeraRaid4 = builder
+            .comment("Уведомлять при обнаружении логова Тера-рейда 4★.",
+                     "Notify when a 4★ Tera Raid den is found.")
+            .define("notifyTeraRaid4", false);
+
+        telegramNotifyTeraRaid5 = builder
+            .comment("Уведомлять при обнаружении логова Тера-рейда 5★.",
+                     "Notify when a 5★ Tera Raid den is found.")
+            .define("notifyTeraRaid5", true);
+
+        telegramNotifyTeraRaid6 = builder
+            .comment("Уведомлять при обнаружении логова Тера-рейда 6★.",
+                     "Notify when a 6★ Tera Raid den is found.")
+            .define("notifyTeraRaid6", true);
+
+        telegramNotifyTeraRaid7 = builder
+            .comment("Уведомлять при обнаружении логова Тера-рейда 7★.",
+                     "Notify when a 7★ Tera Raid den is found.")
+            .define("notifyTeraRaid7", true);
+
+        telegramNotifyMaxRaid1 = builder
+            .comment("Уведомлять при обнаружении логова Макс-рейда 1★.",
+                     "Notify when a 1★ Max Raid den is found.")
+            .define("notifyMaxRaid1", false);
+
+        telegramNotifyMaxRaid2 = builder
+            .comment("Уведомлять при обнаружении логова Макс-рейда 2★.",
+                     "Notify when a 2★ Max Raid den is found.")
+            .define("notifyMaxRaid2", false);
+
+        telegramNotifyMaxRaid3 = builder
+            .comment("Уведомлять при обнаружении логова Макс-рейда 3★.",
+                     "Notify when a 3★ Max Raid den is found.")
+            .define("notifyMaxRaid3", false);
+
+        telegramNotifyMaxRaid4 = builder
+            .comment("Уведомлять при обнаружении логова Макс-рейда 4★.",
+                     "Notify when a 4★ Max Raid den is found.")
+            .define("notifyMaxRaid4", false);
+
+        telegramNotifyMaxRaid5 = builder
+            .comment("Уведомлять при обнаружении логова Макс-рейда 5★.",
+                     "Notify when a 5★ Max Raid den is found.")
+            .define("notifyMaxRaid5", true);
+
+        telegramNotifyMaxRaid6 = builder
+            .comment("Уведомлять при обнаружении логова Макс-рейда 6★.",
+                     "Notify when a 6★ Max Raid den is found.")
+            .define("notifyMaxRaid6", true);
+
+        telegramNotifyMaxRaid7 = builder
+            .comment("Уведомлять при обнаружении логова Макс-рейда 7★.",
+                     "Notify when a 7★ Max Raid den is found.")
+            .define("notifyMaxRaid7", true);
 
         telegramNotifyMasterLoot = builder
             .comment("Уведомлять при обнаружении Master Ball PokéLoot.",

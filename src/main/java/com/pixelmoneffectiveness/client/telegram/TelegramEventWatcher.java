@@ -148,6 +148,30 @@ public class TelegramEventWatcher {
         TelegramBotClient.sendNotification(sb.toString());
     }
 
+    public static boolean isTeraRaid(DenEntity den, RaidData raidData) {
+        try {
+            if (raidData != null && raidData.getType() != null) {
+                if (raidData.getType().is(RaidType.TERA)) return true;
+                var optKey = raidData.getType().unwrapKey();
+                if (optKey.isPresent() && optKey.get().location().getPath().toLowerCase().contains("tera")) {
+                    return true;
+                }
+            }
+        } catch (Throwable ignored) {}
+
+        try {
+            if (den != null && den.getRaidType() != null) {
+                if (den.getRaidType().is(RaidType.TERA)) return true;
+                var optKey = den.getRaidType().unwrapKey();
+                if (optKey.isPresent() && optKey.get().location().getPath().toLowerCase().contains("tera")) {
+                    return true;
+                }
+            }
+        } catch (Throwable ignored) {}
+
+        return false;
+    }
+
     public static void handleDenSpawn(DenEntity den, Level level) {
         if (den == null || !den.isAlive()) return;
         if (TelegramBotClient.isEntityNotified(den.getUUID())) return;
@@ -161,12 +185,8 @@ public class TelegramEventWatcher {
         int stars = raidData.getStars();
         if (stars <= 0) return;
 
-        boolean isTera = false;
-        try {
-            if (raidData.getType() != null && raidData.getType().is(RaidType.TERA)) {
-                isTera = true;
-            }
-        } catch (Throwable ignored) {}
+        boolean isTera = isTeraRaid(den, raidData);
+        TelegramEventType raidEvent = TelegramEventType.getRaidEventType(isTera, stars);
 
         boolean isLegendary = pokemon.isLegendary() || pokemon.isMythical() || pokemon.isUltraBeast();
         boolean isShiny = pokemon.isShiny();
@@ -180,27 +200,22 @@ public class TelegramEventWatcher {
             notify = true;
             header = isTera
                     ? "✨💎 <b>[Pixelmon] Шайни Тера-Рейд (" + stars + "★)!</b>"
-                    : "✨⭐ <b>[Pixelmon] Шайни Рейд (" + stars + "★)!</b>";
+                    : "✨🔴 <b>[Pixelmon] Шайни Макс-Рейд (" + stars + "★)!</b>";
         } else if (isLegendary && TelegramEventType.LEGENDARY.isEnabled()) {
             notify = true;
             header = isTera
-                    ? "✨💎 <b>[Pixelmon] Легендарный Тера-Рейд (" + stars + "★)!</b>"
-                    : "✨⭐ <b>[Pixelmon] Легендарный Рейд (" + stars + "★)!</b>";
+                    ? "👑💎 <b>[Pixelmon] Легендарный Тера-Рейд (" + stars + "★)!</b>"
+                    : "👑🔴 <b>[Pixelmon] Легендарный Макс-Рейд (" + stars + "★)!</b>";
         } else if (isTracked) {
             notify = true;
             header = isTera
-                    ? "📖💎 <b>[Pixelmon] Тера-Рейд с отслеживаемым покемоном (" + stars + "★)!</b>"
-                    : "📖⭐ <b>[Pixelmon] Рейд с отслеживаемым покемоном (" + stars + "★)!</b>";
-        } else if (stars >= 5 && TelegramEventType.TERA_RAID.isEnabled()) {
+                    ? "🎯💎 <b>[Pixelmon] Тера-Рейд с отслеживаемым покемоном (" + stars + "★)!</b>"
+                    : "🎯🔴 <b>[Pixelmon] Макс-Рейд с отслеживаемым покемоном (" + stars + "★)!</b>";
+        } else if (raidEvent != null && raidEvent.isEnabled()) {
             notify = true;
             header = isTera
                     ? "💎 <b>[Pixelmon] Обнаружен Тера-Рейд (" + stars + "★)!</b>"
-                    : "⭐ <b>[Pixelmon] Обнаружен Высокоуровневый Рейд (" + stars + "★)!</b>";
-        } else if (TelegramEventType.ALL_RAID.isEnabled()) {
-            notify = true;
-            header = isTera
-                    ? "💎 <b>[Pixelmon] Обнаружен Тера-Рейд (" + stars + "★)!</b>"
-                    : "⭐ <b>[Pixelmon] Обнаружен Рейд (" + stars + "★)!</b>";
+                    : "🔴 <b>[Pixelmon] Обнаружен Макс-Рейд (" + stars + "★)!</b>";
         }
 
         if (!notify) return;
@@ -211,7 +226,9 @@ public class TelegramEventWatcher {
         StringBuilder sb = new StringBuilder();
         sb.append(header).append("\n\n");
         sb.append("▫️ <b>Покемон:</b> ").append(TelegramBotClient.escapeHtml(pokeName));
-        sb.append(" (").append(stars).append("★");
+        sb.append(" (Ур. ").append(pokemon.getPokemonLevel()).append(")\n");
+        sb.append("▫️ <b>Сложность:</b> ").append(stars).append("★\n");
+        sb.append("▫️ <b>Тип рейда:</b> ").append(isTera ? "💎 Тера-Рейд" : "🔴 Макс-Рейд (Dynamax)").append("\n");
         if (isTera && pokemon.getTeraType() != null) {
             String typeName = "";
             try {
@@ -219,9 +236,8 @@ public class TelegramEventWatcher {
             } catch (Throwable t) {
                 typeName = pokemon.getTeraType().toString();
             }
-            sb.append(" Тера: ").append(TelegramBotClient.escapeHtml(typeName));
+            sb.append("▫️ <b>Тера-тип:</b> ").append(TelegramBotClient.escapeHtml(typeName)).append("\n");
         }
-        sb.append(")\n");
 
         BlockPos pos = den.blockPosition();
         sb.append(TelegramBotClient.formatLocationBlock(pos, level));

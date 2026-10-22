@@ -515,12 +515,7 @@ public class PokeLootRadarClient {
                     boolean isLegendary = pokemon.isLegendary() || pokemon.isMythical() || pokemon.isUltraBeast();
                     boolean isBoss = true;
 
-                    boolean isTera = false;
-                    try {
-                        if (raidData.getType() != null && raidData.getType().is(RaidType.TERA)) {
-                            isTera = true;
-                        }
-                    } catch (Throwable ignored) {}
+                    boolean isTera = com.pixelmoneffectiveness.client.telegram.TelegramEventWatcher.isTeraRaid(den, raidData);
 
                     String displayName = pokemon.getDisplayName().getString();
                     String speciesName = pokemon.getSpecies() != null ? pokemon.getSpecies().getName() : "";
