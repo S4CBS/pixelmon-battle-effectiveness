@@ -320,6 +320,21 @@ public class PokemonOverlaySettingsScreen extends Screen {
         .build();
         this.addRenderableWidget(doneBtn);
 
+        // Telegram Notifications button (bottom right)
+        Button tgBtn = Button.builder(
+            Component.literal(isRu ? "📱 Telegram Уведомления" : "📱 Telegram Notifications"),
+            btn -> {
+                saveConfig();
+                if (this.minecraft != null) {
+                    this.minecraft.setScreen(new com.pixelmoneffectiveness.client.telegram.TelegramSettingsScreen(this));
+                }
+            }
+        )
+        .bounds(left + 225, top + DIALOG_HEIGHT - 28, 210, 20)
+        .tooltip(Tooltip.create(Component.literal(isRu ? "Открыть меню настройки Telegram бота для оповещений о спавнах" : "Open Telegram notifications bot configuration screen")))
+        .build();
+        this.addRenderableWidget(tgBtn);
+
         // Preview toggle button (placed above preview on right column)
         int previewX = left + 225;
         String previewModeStr = previewSneak ? (isRu ? "§dПрисед (Shift)" : "§dSneak (Shift)") : (isRu ? "§aОбычный" : "§aNormal");

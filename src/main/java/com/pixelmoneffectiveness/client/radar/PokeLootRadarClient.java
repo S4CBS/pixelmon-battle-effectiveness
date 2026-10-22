@@ -323,9 +323,10 @@ public class PokeLootRadarClient {
 
                         foundLoot.add(new PokeLootEntry(pos, tier, isHidden, dist, relAngle));
 
-                        if ((tier == PokeLootTier.MASTER || tier == PokeLootTier.BEAST) && !knownHighTierPositions.contains(pos)) {
+                        if ((tier == PokeLootTier.MASTER || tier == PokeLootTier.BEAST || tier == PokeLootTier.ULTRA) && !knownHighTierPositions.contains(pos)) {
                             knownHighTierPositions.add(pos);
                             foundNewHighTier = true;
+                            com.pixelmoneffectiveness.client.telegram.TelegramEventWatcher.onLootChestDiscovered(pos, tier, isHidden, level);
                         }
                     } else if (be instanceof PokeStopTileEntity pokestop) {
                         BlockPos pos = pokestop.getBlockPos();
@@ -351,6 +352,7 @@ public class PokeLootRadarClient {
                         if (stopTier == PokeStopTier.LEGENDARY && !knownHighTierPositions.contains(pos)) {
                             knownHighTierPositions.add(pos);
                             foundNewHighTier = true;
+                            com.pixelmoneffectiveness.client.telegram.TelegramEventWatcher.onPokeStopDiscovered(pos, stopTier, level);
                         }
                     }
                 }
@@ -497,7 +499,9 @@ public class PokeLootRadarClient {
                             foundNewHighTier = true;
                         }
                     }
+                    com.pixelmoneffectiveness.client.telegram.TelegramEventWatcher.handlePixelmonSpawn(pixelmon, level);
                 } else if (entity instanceof DenEntity den && den.isAlive()) {
+                    com.pixelmoneffectiveness.client.telegram.TelegramEventWatcher.handleDenSpawn(den, level);
                     Optional<RaidData> optData = den.getData();
                     if (!optData.isPresent()) continue;
                     RaidData raidData = optData.get();

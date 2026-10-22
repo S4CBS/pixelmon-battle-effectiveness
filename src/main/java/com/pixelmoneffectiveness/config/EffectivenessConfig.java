@@ -63,6 +63,23 @@ public class EffectivenessConfig {
     public final ModConfigSpec.ConfigValue<String> autoFarmHealCommand;
     public final ModConfigSpec.IntValue autoFarmHealThreshold;
 
+    public final ModConfigSpec.BooleanValue telegramEnabled;
+    public final ModConfigSpec.ConfigValue<String> telegramBotToken;
+    public final ModConfigSpec.ConfigValue<String> telegramChatId;
+    public final ModConfigSpec.BooleanValue telegramNotifyShiny;
+    public final ModConfigSpec.BooleanValue telegramNotifyLegendary;
+    public final ModConfigSpec.BooleanValue telegramNotifyUltraBoss;
+    public final ModConfigSpec.BooleanValue telegramNotifyBoss;
+    public final ModConfigSpec.BooleanValue telegramNotifyTeraRaid;
+    public final ModConfigSpec.BooleanValue telegramNotifyAllRaid;
+    public final ModConfigSpec.BooleanValue telegramNotifyMasterLoot;
+    public final ModConfigSpec.BooleanValue telegramNotifyBeastLoot;
+    public final ModConfigSpec.BooleanValue telegramNotifyUltraLoot;
+    public final ModConfigSpec.BooleanValue telegramNotifyLegendaryStop;
+    public final ModConfigSpec.BooleanValue telegramNotifyDitto;
+    public final ModConfigSpec.BooleanValue telegramNotifyPlayerDeath;
+    public final ModConfigSpec.ConfigValue<String> telegramPokemonFilter;
+
     public EffectivenessConfig(ModConfigSpec.Builder builder) {
         builder.push("general");
 
@@ -329,6 +346,90 @@ public class EffectivenessConfig {
             .comment("Порог HP покемона (в %), ниже которого вызывается лечение команды.",
                      "Pokemon HP threshold (in %) below which auto-heal is triggered.")
             .defineInRange("healThreshold", 60, 1, 100);
+
+        builder.pop();
+
+        builder.push("telegram");
+
+        telegramEnabled = builder
+            .comment("Включить отправку уведомлений в Telegram бота при событиях в мире.",
+                     "Enable sending notifications to Telegram bot on world events.")
+            .define("enabled", false);
+
+        telegramBotToken = builder
+            .comment("Токен вашего Telegram бота (получите у @BotFather).",
+                     "Your Telegram bot token (from @BotFather).")
+            .define("botToken", "");
+
+        telegramChatId = builder
+            .comment("ID чата в Telegram, куда отправлять сообщения (узнайте через @userinfobot).",
+                     "Telegram chat ID where to send messages (e.g. from @userinfobot).")
+            .define("chatId", "");
+
+        telegramNotifyShiny = builder
+            .comment("Уведомлять при спавне дикого шайни покемона.",
+                     "Notify when a wild shiny Pokémon spawns.")
+            .define("notifyShiny", true);
+
+        telegramNotifyLegendary = builder
+            .comment("Уведомлять при спавне легендарного, мифического или ультра-чудовища.",
+                     "Notify when a legendary, mythical, or ultra beast Pokémon spawns.")
+            .define("notifyLegendary", true);
+
+        telegramNotifyUltraBoss = builder
+            .comment("Уведомлять при спавне Ультра-боссов (Ultimate, Ultra, etc.).",
+                     "Notify when an Ultra Boss spawns.")
+            .define("notifyUltraBoss", true);
+
+        telegramNotifyBoss = builder
+            .comment("Уведомлять при спавне любых боссов (Rare, Epic, Legendary, etc.).",
+                     "Notify when any boss Pokémon spawns.")
+            .define("notifyBoss", false);
+
+        telegramNotifyTeraRaid = builder
+            .comment("Уведомлять при обнаружении логова Тера-рейда (5★ - 7★).",
+                     "Notify when a high-tier Tera Raid den is found.")
+            .define("notifyTeraRaid", true);
+
+        telegramNotifyAllRaid = builder
+            .comment("Уведомлять при обнаружении любых рейдов.",
+             "Notify when any raid den is found.")
+            .define("notifyAllRaid", false);
+
+        telegramNotifyMasterLoot = builder
+            .comment("Уведомлять при обнаружении Master Ball PokéLoot.",
+                     "Notify when Master Ball PokéLoot chest is found.")
+            .define("notifyMasterLoot", true);
+
+        telegramNotifyBeastLoot = builder
+            .comment("Уведомлять при обнаружении Beast Ball PokéLoot.",
+                     "Notify when Beast Ball PokéLoot chest is found.")
+            .define("notifyBeastLoot", true);
+
+        telegramNotifyUltraLoot = builder
+            .comment("Уведомлять при обнаружении Ultra Ball PokéLoot.",
+                     "Notify when Ultra Ball PokéLoot chest is found.")
+            .define("notifyUltraLoot", false);
+
+        telegramNotifyLegendaryStop = builder
+            .comment("Уведомлять при обнаружении Легендарного ПокеСтопа.",
+                     "Notify when a Legendary PokéStop is found.")
+            .define("notifyLegendaryStop", true);
+
+        telegramNotifyDitto = builder
+            .comment("Уведомлять при обнаружении замаскированного Дитто.",
+                     "Notify when a disguised Ditto is found.")
+            .define("notifyDitto", false);
+
+        telegramNotifyPlayerDeath = builder
+            .comment("Уведомлять при смерти игрока с точными координатами.",
+                     "Notify on player death with exact coordinates.")
+            .define("notifyPlayerDeath", true);
+
+        telegramPokemonFilter = builder
+            .comment("Список английских имен покемонов из Покедекса через запятую для персонального отслеживания.",
+                     "Comma-separated list of English Pokemon names from Pokedex for custom tracking.")
+            .define("pokemonFilter", "");
 
         builder.pop();
     }

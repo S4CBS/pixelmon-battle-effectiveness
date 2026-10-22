@@ -42,6 +42,11 @@ public class PixelmonEffectivenessMod {
         NeoForge.EVENT_BUS.addListener(NightVisionCommand::onPlayerChangedDimension);
         NeoForge.EVENT_BUS.addListener(NightVisionCommand::onPlayerLoggedIn);
 
+        // Telegram Bot event watchers and server command
+        NeoForge.EVENT_BUS.addListener(com.pixelmoneffectiveness.client.telegram.TelegramEventWatcher::onEntityJoinLevel);
+        NeoForge.EVENT_BUS.addListener(com.pixelmoneffectiveness.client.telegram.TelegramEventWatcher::onLivingDeath);
+        NeoForge.EVENT_BUS.addListener(com.pixelmoneffectiveness.client.telegram.TelegramCommand::onRegisterCommands);
+
         // Ultra Space flight upward pull fix (counteracts Pixelmon's +0.07d/tick upward acceleration during flight)
         NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, UltraSpaceFlightHandler::onEntityTickPost);
 
@@ -58,6 +63,18 @@ public class PixelmonEffectivenessMod {
             BattleSwitchOverlayClient.init(modEventBus);
             RaidMenuOverlayClient.init(modEventBus);
             BattleMoveOverlayClient.init(modEventBus);
+
+            modEventBus.addListener((net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent event) -> {
+                event.register(com.pixelmoneffectiveness.client.telegram.TelegramSettingsScreen.OPEN_TELEGRAM_KEY);
+            });
+            NeoForge.EVENT_BUS.addListener(com.pixelmoneffectiveness.client.telegram.TelegramCommand::onRegisterClientCommands);
+            NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.client.event.ClientTickEvent.Post event) -> {
+                net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+                if (mc.level == null || mc.player == null) return;
+                while (com.pixelmoneffectiveness.client.telegram.TelegramSettingsScreen.OPEN_TELEGRAM_KEY.consumeClick()) {
+                    mc.setScreen(new com.pixelmoneffectiveness.client.telegram.TelegramSettingsScreen(null));
+                }
+            });
         }
     }
 }

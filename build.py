@@ -63,7 +63,7 @@ def build():
     shutil.copytree('build/classes', build_jar, dirs_exist_ok=True)
 
     os.makedirs('build/libs', exist_ok=True)
-    jar_file = 'build/libs/PixelmonEffectiveness-1.21.1-1.0.9.jar'
+    jar_file = 'build/libs/PixelmonEffectiveness-1.21.1-1.1.0.jar'
     if os.path.exists(jar_file):
         os.remove(jar_file)
 
@@ -76,22 +76,22 @@ def build():
 
     print(f'Created JAR: {jar_file} ({os.path.getsize(jar_file)} bytes)')
 
-    dest_jar = os.path.join(mods_dir, 'PixelmonEffectiveness-1.21.1-1.0.9.jar')
+    dest_jar = os.path.join(mods_dir, 'PixelmonEffectiveness-1.21.1-1.1.0.jar')
     shutil.copy2(jar_file, dest_jar)
     print(f'Deployed to mods: {dest_jar}')
 
     modpack_dir = r'c:\Users\s4cbs\Documents\antigravity\pixelmon-1.21.1-modpack\mods'
     if os.path.exists(modpack_dir):
-        modpack_dest = os.path.join(modpack_dir, 'PixelmonEffectiveness-1.21.1-1.0.9.jar')
+        modpack_dest = os.path.join(modpack_dir, 'PixelmonEffectiveness-1.21.1-1.1.0.jar')
         shutil.copy2(jar_file, modpack_dest)
         print(f'Deployed to modpack: {modpack_dest}')
-        for old_pack in ['PixelmonEffectiveness-1.21.1-1.0.0.jar', 'PixelmonEffectiveness-1.21.1-1.0.1.jar', 'PixelmonEffectiveness-1.21.1-1.0.2.jar', 'PixelmonEffectiveness-1.21.1-1.0.3.jar', 'PixelmonEffectiveness-1.21.1-1.0.4.jar', 'PixelmonEffectiveness-1.21.1-1.0.5.jar', 'PixelmonEffectiveness-1.21.1-1.0.6.jar', 'PixelmonEffectiveness-1.21.1-1.0.7.jar', 'PixelmonEffectiveness-1.21.1-1.0.8.jar']:
+        for old_pack in ['PixelmonEffectiveness-1.21.1-1.0.0.jar', 'PixelmonEffectiveness-1.21.1-1.0.1.jar', 'PixelmonEffectiveness-1.21.1-1.0.2.jar', 'PixelmonEffectiveness-1.21.1-1.0.3.jar', 'PixelmonEffectiveness-1.21.1-1.0.4.jar', 'PixelmonEffectiveness-1.21.1-1.0.5.jar', 'PixelmonEffectiveness-1.21.1-1.0.6.jar', 'PixelmonEffectiveness-1.21.1-1.0.7.jar', 'PixelmonEffectiveness-1.21.1-1.0.8.jar', 'PixelmonEffectiveness-1.21.1-1.0.9.jar']:
             old_p = os.path.join(modpack_dir, old_pack)
             if os.path.exists(old_p):
                 os.remove(old_p)
                 print(f'Removed from modpack: {old_pack}')
 
-    for old in ['PixelmonEffectiveness-1.21.1-1.0.0.jar', 'PixelmonEffectiveness-1.21.1-1.0.1.jar', 'PixelmonEffectiveness-1.21.1-1.0.2.jar', 'PixelmonEffectiveness-1.21.1-1.0.3.jar', 'PixelmonEffectiveness-1.21.1-1.0.4.jar', 'PixelmonEffectiveness-1.21.1-1.0.5.jar', 'PixelmonEffectiveness-1.21.1-1.0.6.jar', 'PixelmonEffectiveness-1.21.1-1.0.7.jar', 'PixelmonEffectiveness-1.21.1-1.0.8.jar']:
+    for old in ['PixelmonEffectiveness-1.21.1-1.0.0.jar', 'PixelmonEffectiveness-1.21.1-1.0.1.jar', 'PixelmonEffectiveness-1.21.1-1.0.2.jar', 'PixelmonEffectiveness-1.21.1-1.0.3.jar', 'PixelmonEffectiveness-1.21.1-1.0.4.jar', 'PixelmonEffectiveness-1.21.1-1.0.5.jar', 'PixelmonEffectiveness-1.21.1-1.0.6.jar', 'PixelmonEffectiveness-1.21.1-1.0.7.jar', 'PixelmonEffectiveness-1.21.1-1.0.8.jar', 'PixelmonEffectiveness-1.21.1-1.0.9.jar']:
         p = os.path.join(mods_dir, old)
         if os.path.exists(p):
             os.remove(p)

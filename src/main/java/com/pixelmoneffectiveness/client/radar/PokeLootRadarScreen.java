@@ -300,23 +300,36 @@ public class PokeLootRadarScreen extends Screen {
 
         // --- Bottom Actions ---
         Button overlayBtn = Button.builder(
-            Component.literal(isRu ? "⚙ Инфо-панель" : "⚙ Overlay"),
+            Component.literal(isRu ? "⚙ Инфо" : "⚙ Overlay"),
             btn -> {
                 if (this.minecraft != null) {
                     this.minecraft.setScreen(new com.pixelmoneffectiveness.client.overlay.PokemonOverlaySettingsScreen());
                 }
             }
         )
-        .bounds(left + 10, top + 307, 122, 22)
+        .bounds(left + 10, top + 307, 78, 22)
         .tooltip(Tooltip.create(Component.literal(isRu ? "Настройки инфо-панели покемона при наведении (Cobblemon HUD)" : "Configure Pokémon info overlay tooltip (Cobblemon HUD)")))
         .build();
         this.addRenderableWidget(overlayBtn);
+
+        Button telegramBtn = Button.builder(
+            Component.literal(isRu ? "📱 Telegram" : "📱 Telegram"),
+            btn -> {
+                if (this.minecraft != null) {
+                    this.minecraft.setScreen(new com.pixelmoneffectiveness.client.telegram.TelegramSettingsScreen(this));
+                }
+            }
+        )
+        .bounds(left + 92, top + 307, 82, 22)
+        .tooltip(Tooltip.create(Component.literal(isRu ? "Настройки уведомлений в Telegram бота (спавны Шайни, Легенд, Боссов)" : "Configure Telegram notifications bot (Shiny, Legendary, Boss spawns)")))
+        .build();
+        this.addRenderableWidget(telegramBtn);
 
         Button doneBtn = Button.builder(
             Component.literal(isRu ? "✔ Готово" : "✔ Done"),
             btn -> this.onClose()
         )
-        .bounds(left + 138, top + 307, 122, 22)
+        .bounds(left + 178, top + 307, 82, 22)
         .build();
         this.addRenderableWidget(doneBtn);
     }
