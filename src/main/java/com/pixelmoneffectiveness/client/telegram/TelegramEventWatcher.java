@@ -168,15 +168,39 @@ public class TelegramEventWatcher {
             }
         } catch (Throwable ignored) {}
 
+        boolean isLegendary = pokemon.isLegendary() || pokemon.isMythical() || pokemon.isUltraBeast();
+        boolean isShiny = pokemon.isShiny();
+        String speciesName = (pokemon.getSpecies() != null) ? pokemon.getSpecies().getName() : "";
+        boolean isTracked = TelegramBotClient.isPokemonTracked(speciesName);
+
         boolean notify = false;
         String header = "";
 
-        if (isTera && stars >= 5 && TelegramEventType.TERA_RAID.isEnabled()) {
+        if (isShiny && TelegramEventType.SHINY.isEnabled()) {
             notify = true;
-            header = "💎 <b>[Pixelmon] Обнаружен Тера-Рейд (" + stars + "★)!</b>";
+            header = isTera
+                    ? "✨💎 <b>[Pixelmon] Шайни Тера-Рейд (" + stars + "★)!</b>"
+                    : "✨⭐ <b>[Pixelmon] Шайни Рейд (" + stars + "★)!</b>";
+        } else if (isLegendary && TelegramEventType.LEGENDARY.isEnabled()) {
+            notify = true;
+            header = isTera
+                    ? "✨💎 <b>[Pixelmon] Легендарный Тера-Рейд (" + stars + "★)!</b>"
+                    : "✨⭐ <b>[Pixelmon] Легендарный Рейд (" + stars + "★)!</b>";
+        } else if (isTracked) {
+            notify = true;
+            header = isTera
+                    ? "📖💎 <b>[Pixelmon] Тера-Рейд с отслеживаемым покемоном (" + stars + "★)!</b>"
+                    : "📖⭐ <b>[Pixelmon] Рейд с отслеживаемым покемоном (" + stars + "★)!</b>";
+        } else if (stars >= 5 && TelegramEventType.TERA_RAID.isEnabled()) {
+            notify = true;
+            header = isTera
+                    ? "💎 <b>[Pixelmon] Обнаружен Тера-Рейд (" + stars + "★)!</b>"
+                    : "⭐ <b>[Pixelmon] Обнаружен Высокоуровневый Рейд (" + stars + "★)!</b>";
         } else if (TelegramEventType.ALL_RAID.isEnabled()) {
             notify = true;
-            header = "⭐ <b>[Pixelmon] Обнаружен Рейд (" + stars + "★)!</b>";
+            header = isTera
+                    ? "💎 <b>[Pixelmon] Обнаружен Тера-Рейд (" + stars + "★)!</b>"
+                    : "⭐ <b>[Pixelmon] Обнаружен Рейд (" + stars + "★)!</b>";
         }
 
         if (!notify) return;
