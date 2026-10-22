@@ -27,26 +27,28 @@ public class TelegramSettingsScreen extends Screen {
     private static final int DIALOG_HEIGHT = 312;
 
     public enum Tab {
-        ALL("⭐ Все", "⭐ All"),
-        SPECIAL("🔔 Категории", "🔔 Categories"),
-        POKEDEX("📖 Покедекс", "📖 Pokédex"),
-        SETTINGS("⚙️ Бот", "⚙️ Bot Setup");
+        ALL(TelegramTab.ALL),
+        SPECIAL(TelegramTab.SPECIAL),
+        POKEDEX(TelegramTab.POKEDEX),
+        SETTINGS(TelegramTab.SETTINGS);
 
+        public final TelegramTab delegate;
         public final String nameRu;
         public final String nameEn;
 
-        Tab(String nameRu, String nameEn) {
-            this.nameRu = nameRu;
-            this.nameEn = nameEn;
+        Tab(TelegramTab delegate) {
+            this.delegate = delegate;
+            this.nameRu = delegate.nameRu;
+            this.nameEn = delegate.nameEn;
         }
 
         public String getDisplayName(boolean isRu) {
-            return isRu ? nameRu : nameEn;
+            return delegate.getDisplayName(isRu);
         }
     }
 
     private final Screen parentScreen;
-    private Tab activeTab = Tab.SPECIAL;
+    private TelegramTab activeTab = TelegramTab.SPECIAL;
 
     private EditBox searchBox;
     private EditBox tokenBox;
@@ -97,13 +99,13 @@ public class TelegramSettingsScreen extends Screen {
         this.addRenderableWidget(masterToggleBtn);
 
         // Tab buttons (Row: top + 26)
-        Tab[] tabs = Tab.values();
+        TelegramTab[] tabs = TelegramTab.values();
         int tabY = top + 26;
         int tabH = 16;
         int tabW = (DIALOG_WIDTH - 20 - (tabs.length - 1) * 2) / tabs.length;
 
         for (int i = 0; i < tabs.length; i++) {
-            final Tab tab = tabs[i];
+            final TelegramTab tab = tabs[i];
             boolean isSel = (tab == activeTab);
             String title = isSel ? ("§e" + tab.getDisplayName(isRu)) : tab.getDisplayName(isRu);
             int tabX = left + 10 + i * (tabW + 2);
@@ -119,7 +121,7 @@ public class TelegramSettingsScreen extends Screen {
             this.addRenderableWidget(tabBtn);
         }
 
-        if (activeTab == Tab.SETTINGS) {
+        if (activeTab == TelegramTab.SETTINGS) {
             initSettingsTabWidgets(left, top, isRu);
         } else {
             initListTabWidgets(left, top, isRu);
@@ -199,12 +201,12 @@ public class TelegramSettingsScreen extends Screen {
         int btnW = 86;
 
         Button selectAllBtn = Button.builder(Component.literal(isRu ? "✓ Все" : "✓ All"), btn -> {
-            if (activeTab == Tab.SPECIAL || activeTab == Tab.ALL) {
+            if (activeTab == TelegramTab.SPECIAL || activeTab == TelegramTab.ALL) {
                 for (TelegramEventType type : TelegramEventType.values()) {
                     type.setEnabled(true);
                 }
             }
-            if (activeTab == Tab.POKEDEX || activeTab == Tab.ALL) {
+            if (activeTab == TelegramTab.POKEDEX || activeTab == TelegramTab.ALL) {
                 for (PokemonPokedexScreen.SpeciesEntry e : PokemonPokedexScreen.getAllSpeciesEntries()) {
                     selectedPokemonNames.add(e.englishName);
                 }
@@ -216,12 +218,12 @@ public class TelegramSettingsScreen extends Screen {
         this.addRenderableWidget(selectAllBtn);
 
         Button selectNoneBtn = Button.builder(Component.literal(isRu ? "✕ Сброс" : "✕ Clear"), btn -> {
-            if (activeTab == Tab.SPECIAL || activeTab == Tab.ALL) {
+            if (activeTab == TelegramTab.SPECIAL || activeTab == TelegramTab.ALL) {
                 for (TelegramEventType type : TelegramEventType.values()) {
                     type.setEnabled(false);
                 }
             }
-            if (activeTab == Tab.POKEDEX || activeTab == Tab.ALL) {
+            if (activeTab == TelegramTab.POKEDEX || activeTab == TelegramTab.ALL) {
                 selectedPokemonNames.clear();
             }
             rebuildScreen();
@@ -299,9 +301,9 @@ public class TelegramSettingsScreen extends Screen {
         // Filter Special Events
         List<TelegramEventType> spResult = new ArrayList<>();
         for (TelegramEventType type : TelegramEventType.values()) {
-            if (activeTab == Tab.ALL && !type.isEnabled() && !query.isEmpty()) {
+            if (activeTab == TelegramTab.ALL && !type.isEnabled() && !query.isEmpty()) {
                 // In ALL tab, if searching, allow matching
-            } else if (activeTab == Tab.ALL && !type.isEnabled()) {
+            } else if (activeTab == TelegramTab.ALL && !type.isEnabled()) {
                 continue; // Only show enabled in ALL tab if not searching
             }
             if (!query.isEmpty()) {
@@ -317,10 +319,10 @@ public class TelegramSettingsScreen extends Screen {
 
         // Filter Pokédex entries
         List<PokemonPokedexScreen.SpeciesEntry> pkResult = new ArrayList<>();
-        if (activeTab == Tab.POKEDEX || activeTab == Tab.ALL) {
+        if (activeTab == TelegramTab.POKEDEX || activeTab == TelegramTab.ALL) {
             for (PokemonPokedexScreen.SpeciesEntry entry : PokemonPokedexScreen.getAllSpeciesEntries()) {
                 boolean isSelected = selectedPokemonNames.contains(entry.englishName);
-                if (activeTab == Tab.ALL && !isSelected) {
+                if (activeTab == TelegramTab.ALL && !isSelected) {
                     continue; // Show only selected in ALL tab
                 }
                 if (!query.isEmpty()) {
@@ -342,11 +344,11 @@ public class TelegramSettingsScreen extends Screen {
         int listHeight = 216;
         int totalContentHeight = 0;
 
-        if (activeTab == Tab.SPECIAL) {
+        if (activeTab == TelegramTab.SPECIAL) {
             totalContentHeight = displayedSpecialEvents.size() * 26;
-        } else if (activeTab == Tab.POKEDEX) {
+        } else if (activeTab == TelegramTab.POKEDEX) {
             totalContentHeight = ((displayedSpecies.size() + 1) / 2) * 28;
-        } else if (activeTab == Tab.ALL) {
+        } else if (activeTab == TelegramTab.ALL) {
             totalContentHeight = displayedSpecialEvents.size() * 26 + ((displayedSpecies.size() + 1) / 2) * 28 + 20;
         }
 
@@ -366,7 +368,7 @@ public class TelegramSettingsScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-        if (activeTab != Tab.SETTINGS) {
+        if (activeTab != TelegramTab.SETTINGS) {
             scrollOffset -= scrollY * 26.0;
             clampScroll();
             return true;
@@ -376,7 +378,7 @@ public class TelegramSettingsScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (button == 0 && activeTab != Tab.SETTINGS) {
+        if (button == 0 && activeTab != TelegramTab.SETTINGS) {
             int left = (this.width - DIALOG_WIDTH) / 2;
             int top = (this.height - DIALOG_HEIGHT) / 2;
             int listTop = top + 66;
@@ -385,7 +387,7 @@ public class TelegramSettingsScreen extends Screen {
             if (mouseX >= left + 10 && mouseX <= left + DIALOG_WIDTH - 10 && mouseY >= listTop && mouseY <= listBottom) {
                 int relY = (int) (mouseY - listTop + scrollOffset);
 
-                if (activeTab == Tab.SPECIAL) {
+                if (activeTab == TelegramTab.SPECIAL) {
                     int index = relY / 26;
                     if (index >= 0 && index < displayedSpecialEvents.size()) {
                         TelegramEventType type = displayedSpecialEvents.get(index);
@@ -393,7 +395,7 @@ public class TelegramSettingsScreen extends Screen {
                         playClickSound();
                         return true;
                     }
-                } else if (activeTab == Tab.POKEDEX) {
+                } else if (activeTab == TelegramTab.POKEDEX) {
                     int col = (mouseX < left + 188) ? 0 : 1;
                     int row = relY / 28;
                     int index = row * 2 + col;
@@ -407,7 +409,7 @@ public class TelegramSettingsScreen extends Screen {
                         playClickSound();
                         return true;
                     }
-                } else if (activeTab == Tab.ALL) {
+                } else if (activeTab == TelegramTab.ALL) {
                     int spHeight = displayedSpecialEvents.size() * 26;
                     if (relY < spHeight) {
                         int index = relY / 26;
@@ -478,7 +480,7 @@ public class TelegramSettingsScreen extends Screen {
         g.drawString(this.font, isRu ? "📱 Telegram Уведомления" : "📱 Telegram Notifications", left + 12, top + 10, 0xFFFFFFFF, true);
 
         // 4. Tab content
-        if (activeTab == Tab.SETTINGS) {
+        if (activeTab == TelegramTab.SETTINGS) {
             renderSettingsTab(g, left, top, isRu);
         } else {
             renderListTab(g, left, top, mouseX, mouseY, isRu);
@@ -520,7 +522,7 @@ public class TelegramSettingsScreen extends Screen {
 
         int curY = listTop - (int) scrollOffset;
 
-        if (activeTab == Tab.SPECIAL || activeTab == Tab.ALL) {
+        if (activeTab == TelegramTab.SPECIAL || activeTab == TelegramTab.ALL) {
             for (TelegramEventType type : displayedSpecialEvents) {
                 if (curY + 24 >= listTop && curY <= listBottom) {
                     boolean hovered = (mouseX >= left + 10 && mouseX <= left + DIALOG_WIDTH - 14 && mouseY >= Math.max(listTop, curY) && mouseY <= Math.min(listBottom, curY + 24));
@@ -551,12 +553,12 @@ public class TelegramSettingsScreen extends Screen {
             }
         }
 
-        if (activeTab == Tab.ALL && !displayedSpecies.isEmpty()) {
+        if (activeTab == TelegramTab.ALL && !displayedSpecies.isEmpty()) {
             g.drawString(this.font, isRu ? "§6Отслеживаемые покемоны из Покедекса:" : "§6Tracked Pokédex Pokémon:", left + 12, curY + 4, 0xFDE047, true);
             curY += 16;
         }
 
-        if (activeTab == Tab.POKEDEX || activeTab == Tab.ALL) {
+        if (activeTab == TelegramTab.POKEDEX || activeTab == TelegramTab.ALL) {
             int cardW = 174;
             int cardH = 26;
 
@@ -602,11 +604,11 @@ public class TelegramSettingsScreen extends Screen {
 
         // Scrollbar
         int totalContentHeight = 0;
-        if (activeTab == Tab.SPECIAL) {
+        if (activeTab == TelegramTab.SPECIAL) {
             totalContentHeight = displayedSpecialEvents.size() * 26;
-        } else if (activeTab == Tab.POKEDEX) {
+        } else if (activeTab == TelegramTab.POKEDEX) {
             totalContentHeight = ((displayedSpecies.size() + 1) / 2) * 28;
-        } else if (activeTab == Tab.ALL) {
+        } else if (activeTab == TelegramTab.ALL) {
             totalContentHeight = displayedSpecialEvents.size() * 26 + ((displayedSpecies.size() + 1) / 2) * 28 + 20;
         }
 
