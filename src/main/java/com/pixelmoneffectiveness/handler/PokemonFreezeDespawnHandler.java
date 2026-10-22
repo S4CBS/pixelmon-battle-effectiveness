@@ -26,6 +26,7 @@ public class PokemonFreezeDespawnHandler {
     private static final String NBT_LAST_FAR_SEEN = "pe_last_seen_time";
     private static final String NBT_GLOBAL_DESPAWN = "pe_global_despawn_time";
     private static final String NBT_FREEZE_TIME = "pe_freeze_time";
+    public static final String NBT_SPAWN_TIME = "pe_spawn_time";
 
     private static CompoundTag getPersistentData(PixelmonEntity pixelmon) {
         if ((Object) pixelmon instanceof IEntityExtension ext) {
@@ -52,6 +53,10 @@ public class PokemonFreezeDespawnHandler {
         long now = System.currentTimeMillis();
 
         if (event.loadedFromDisk()) {
+            if (data != null && !data.contains(NBT_SPAWN_TIME)) {
+                data.putLong(NBT_SPAWN_TIME, now - (pixelmon.tickCount * 50L));
+            }
+
             if (data != null && data.contains(NBT_GLOBAL_DESPAWN)) {
                 long globalDespawn = data.getLong(NBT_GLOBAL_DESPAWN);
                 if (now >= globalDespawn) {
@@ -94,6 +99,7 @@ public class PokemonFreezeDespawnHandler {
             // Fresh spawn
             if (data != null) {
                 data.putLong(NBT_LAST_FAR_SEEN, now);
+                data.putLong(NBT_SPAWN_TIME, now);
             }
 
             Double minDistanceSq = getMinPlayerDistanceSq(pixelmon, event.getLevel());

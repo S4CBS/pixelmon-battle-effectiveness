@@ -11,6 +11,7 @@ import com.pixelmoneffectiveness.command.NightVisionCommand;
 import com.pixelmoneffectiveness.handler.ApricornTreeHarvestHandler;
 import com.pixelmoneffectiveness.handler.DittoDisguiseHandler;
 import com.pixelmoneffectiveness.handler.PokemonFreezeDespawnHandler;
+import com.pixelmoneffectiveness.handler.PokemonSpawnCapReliefHandler;
 import com.pixelmoneffectiveness.handler.UltraSpaceFlightHandler;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.EventPriority;
@@ -34,6 +35,7 @@ public class PixelmonEffectivenessMod {
         NeoForge.EVENT_BUS.addListener(ApricornTreeHarvestHandler::onRightClickBlock);
         NeoForge.EVENT_BUS.addListener(PokemonFreezeDespawnHandler::onEntityJoinLevel);
         NeoForge.EVENT_BUS.addListener(PokemonFreezeDespawnHandler::onEntityTick);
+        NeoForge.EVENT_BUS.addListener(PokemonSpawnCapReliefHandler::onServerTick);
         NeoForge.EVENT_BUS.addListener(DittoDisguiseHandler::onEntityJoinLevel);
 
         // Commands and persistent effects
