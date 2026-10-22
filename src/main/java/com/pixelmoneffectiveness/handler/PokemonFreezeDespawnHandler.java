@@ -16,10 +16,10 @@ public class PokemonFreezeDespawnHandler {
     public static final double DESPAWN_DISTANCE_BLOCKS = 1000.0; // 1000 blocks
     public static final double DESPAWN_DISTANCE_SQ = DESPAWN_DISTANCE_BLOCKS * DESPAWN_DISTANCE_BLOCKS;
 
-    public static final double FREEZE_DISTANCE_BLOCKS = 32.0; // 32 blocks
+    public static final double FREEZE_DISTANCE_BLOCKS = 300.0; // 300 blocks (AI active within 300 blocks)
     public static final double FREEZE_DISTANCE_SQ = FREEZE_DISTANCE_BLOCKS * FREEZE_DISTANCE_BLOCKS;
 
-    public static final long FAR_DESPAWN_TIMEOUT_MS = 10L * 60L * 1000L; // 10 minutes (32 to 1000 blocks)
+    public static final long FAR_DESPAWN_TIMEOUT_MS = 10L * 60L * 1000L; // 10 minutes (300 to 1000 blocks)
     public static final long NEAR_DESPAWN_TIMEOUT_MS = 4L * 60L * 1000L; // 4 minutes (active/near lifetime)
     private static final long FREEZE_REAPPROACH_THRESHOLD_MS = 10_000L; // 10 seconds away to consider re-approached
 

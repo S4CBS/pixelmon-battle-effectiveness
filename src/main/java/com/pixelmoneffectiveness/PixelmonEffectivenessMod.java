@@ -7,6 +7,8 @@ import com.pixelmoneffectiveness.client.battle.BattleSwitchOverlayClient;
 import com.pixelmoneffectiveness.client.overlay.PokemonOverlayClient;
 import com.pixelmoneffectiveness.client.radar.PokeLootRadarClient;
 import com.pixelmoneffectiveness.client.raid.RaidMenuOverlayClient;
+import com.pixelmoneffectiveness.client.render.PokemonDespawnDebugRenderer;
+import com.pixelmoneffectiveness.command.NbtPixelmonDebugCommand;
 import com.pixelmoneffectiveness.command.NightVisionCommand;
 import com.pixelmoneffectiveness.handler.ApricornTreeHarvestHandler;
 import com.pixelmoneffectiveness.handler.DittoDisguiseHandler;
@@ -43,6 +45,7 @@ public class PixelmonEffectivenessMod {
         NeoForge.EVENT_BUS.addListener(NightVisionCommand::onPlayerRespawn);
         NeoForge.EVENT_BUS.addListener(NightVisionCommand::onPlayerChangedDimension);
         NeoForge.EVENT_BUS.addListener(NightVisionCommand::onPlayerLoggedIn);
+        NeoForge.EVENT_BUS.addListener(NbtPixelmonDebugCommand::onRegisterCommands);
 
         // Telegram Bot event watchers and server command
         NeoForge.EVENT_BUS.addListener(com.pixelmoneffectiveness.client.telegram.TelegramEventWatcher::onEntityJoinLevel);
@@ -65,6 +68,7 @@ public class PixelmonEffectivenessMod {
             BattleSwitchOverlayClient.init(modEventBus);
             RaidMenuOverlayClient.init(modEventBus);
             BattleMoveOverlayClient.init(modEventBus);
+            PokemonDespawnDebugRenderer.init();
 
             modEventBus.addListener((net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent event) -> {
                 event.register(com.pixelmoneffectiveness.client.telegram.TelegramSettingsScreen.OPEN_TELEGRAM_KEY);
