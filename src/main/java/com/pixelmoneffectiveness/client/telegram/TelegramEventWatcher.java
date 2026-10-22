@@ -51,6 +51,8 @@ public class TelegramEventWatcher {
         boolean isLegendary = pokemon.isLegendary() || pokemon.isMythical() || pokemon.isUltraBeast();
         boolean isBoss = false;
         boolean isUltraBoss = false;
+        boolean isLegendaryBoss = false;
+        boolean isEpicBoss = false;
         String bossTierTitle = "";
 
         try {
@@ -65,8 +67,12 @@ public class TelegramEventWatcher {
                         : tier.getID();
 
                 String tierId = (tier.getID() != null) ? tier.getID().toLowerCase() : "";
-                if (tierId.equals("ultimate") || tierId.equals("legendary") || tierId.contains("ultra") || tier.getExtraLevels() >= 40 || tier.isMega()) {
+                if (tierId.equals("ultimate") || tierId.contains("ultra")) {
                     isUltraBoss = true;
+                } else if (tierId.equals("legendary")) {
+                    isLegendaryBoss = true;
+                } else if (tierId.equals("epic")) {
+                    isEpicBoss = true;
                 }
             }
         } catch (Throwable ignored) {}
@@ -92,6 +98,12 @@ public class TelegramEventWatcher {
         } else if (isUltraBoss && TelegramEventType.ULTRA_BOSS.isEnabled()) {
             notify = true;
             eventHeader = "👹 <b>[Pixelmon] Спавн Ультра-босса!</b>";
+        } else if (isLegendaryBoss && TelegramEventType.LEGENDARY_BOSS.isEnabled()) {
+            notify = true;
+            eventHeader = "👑 <b>[Pixelmon] Спавн Легендарного босса!</b>";
+        } else if (isEpicBoss && TelegramEventType.EPIC_BOSS.isEnabled()) {
+            notify = true;
+            eventHeader = "🔮 <b>[Pixelmon] Спавн Эпического босса!</b>";
         } else if (isBoss && TelegramEventType.ALL_BOSS.isEnabled()) {
             notify = true;
             eventHeader = "⚔️ <b>[Pixelmon] Спавн Босса!</b>";

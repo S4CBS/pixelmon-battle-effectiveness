@@ -69,6 +69,8 @@ public class EffectivenessConfig {
     public final ModConfigSpec.BooleanValue telegramNotifyShiny;
     public final ModConfigSpec.BooleanValue telegramNotifyLegendary;
     public final ModConfigSpec.BooleanValue telegramNotifyUltraBoss;
+    public final ModConfigSpec.BooleanValue telegramNotifyLegendaryBoss;
+    public final ModConfigSpec.BooleanValue telegramNotifyEpicBoss;
     public final ModConfigSpec.BooleanValue telegramNotifyBoss;
     public final ModConfigSpec.BooleanValue telegramNotifyTeraRaid;
     public final ModConfigSpec.BooleanValue telegramNotifyAllRaid;
@@ -377,13 +379,23 @@ public class EffectivenessConfig {
             .define("notifyLegendary", true);
 
         telegramNotifyUltraBoss = builder
-            .comment("Уведомлять при спавне Ультра-боссов (Ultimate, Ultra, etc.).",
-                     "Notify when an Ultra Boss spawns.")
+            .comment("Уведомлять при спавне Ультра-боссов (Ultimate tier, бирюзовый).",
+                     "Notify when an Ultra Boss (Ultimate tier) spawns.")
             .define("notifyUltraBoss", true);
 
+        telegramNotifyLegendaryBoss = builder
+            .comment("Уведомлять при спавне Легендарных боссов (Legendary tier, оранжевый).",
+                     "Notify when a Legendary tier boss spawns.")
+            .define("notifyLegendaryBoss", false);
+
+        telegramNotifyEpicBoss = builder
+            .comment("Уведомлять при спавне Эпических боссов (Epic tier, фиолетовый).",
+                     "Notify when an Epic tier boss spawns.")
+            .define("notifyEpicBoss", false);
+
         telegramNotifyBoss = builder
-            .comment("Уведомлять при спавне любых боссов (Rare, Epic, Legendary, etc.).",
-                     "Notify when any boss Pokémon spawns.")
+            .comment("Уведомлять при спавне любых остальных боссов (Rare, Uncommon и др.).",
+                     "Notify when any other boss Pokémon spawns.")
             .define("notifyBoss", false);
 
         telegramNotifyTeraRaid = builder

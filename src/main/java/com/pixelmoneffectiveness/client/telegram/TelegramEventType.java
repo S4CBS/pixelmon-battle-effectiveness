@@ -5,8 +5,10 @@ import com.pixelmoneffectiveness.config.EffectivenessConfig;
 public enum TelegramEventType {
     SHINY("shiny", "✨ Шайни покемоны", "✨ Shiny Pokémon", "Спавн любого дикого шайни покемона", "Spawn of any wild shiny Pokémon"),
     LEGENDARY("legendary", "👑 Легендарные и Мифические", "👑 Legendaries & Mythicals", "Спавн легендарных, мифических и Ultra Beast", "Spawn of legendary, mythical, and ultra beast Pokémon"),
-    ULTRA_BOSS("ultra_boss", "👹 Ультра-боссы", "👹 Ultra Bosses", "Спавн боссов высших уровней (Ultimate, Ultra, etc.)", "Spawn of highest tier boss Pokémon"),
-    ALL_BOSS("all_boss", "⚔️ Все боссы", "⚔️ All Bosses", "Спавн любых боссов (Rare, Epic, Legendary)", "Spawn of any boss tier Pokémon"),
+    ULTRA_BOSS("ultra_boss", "👹 Ультра-боссы (Ultimate)", "👹 Ultra Bosses (Ultimate)", "Спавн ультиматных боссов (Ultimate tier, бирюзовый)", "Spawn of Ultimate tier boss Pokémon"),
+    LEGENDARY_BOSS("legendary_boss", "👑 Легендарные боссы", "👑 Legendary Bosses", "Спавн боссов легендарного ранга (Legendary tier, оранжевый)", "Spawn of Legendary tier boss Pokémon"),
+    EPIC_BOSS("epic_boss", "🔮 Эпические боссы", "🔮 Epic Bosses", "Спавн боссов эпического ранга (Epic tier, фиолетовый)", "Spawn of Epic tier boss Pokémon"),
+    ALL_BOSS("all_boss", "⚔️ Все боссы (Любые)", "⚔️ All Other Bosses", "Спавн любых остальных боссов (Rare, Uncommon)", "Spawn of any other boss Pokémon"),
     TERA_RAID("tera_raid", "💎 Тера-рейды (5-7★)", "💎 Tera Raids (5-7★)", "Появление логовищ Тера-рейдов высокой сложности", "High-tier Tera Raid dens"),
     ALL_RAID("all_raid", "⭐ Все рейдовые логовища", "⭐ All Raid Dens", "Появление любых рейдов (1-7★)", "Any raid dens"),
     MASTER_LOOT("master_loot", "🟣 Master Ball PokéLoot", "🟣 Master Ball PokéLoot", "Обнаружение сундука Мастербол", "Master Ball chest discovered"),
@@ -44,6 +46,8 @@ public enum TelegramEventType {
             case SHINY -> EffectivenessConfig.CONFIG.telegramNotifyShiny.get();
             case LEGENDARY -> EffectivenessConfig.CONFIG.telegramNotifyLegendary.get();
             case ULTRA_BOSS -> EffectivenessConfig.CONFIG.telegramNotifyUltraBoss.get();
+            case LEGENDARY_BOSS -> EffectivenessConfig.CONFIG.telegramNotifyLegendaryBoss.get();
+            case EPIC_BOSS -> EffectivenessConfig.CONFIG.telegramNotifyEpicBoss.get();
             case ALL_BOSS -> EffectivenessConfig.CONFIG.telegramNotifyBoss.get();
             case TERA_RAID -> EffectivenessConfig.CONFIG.telegramNotifyTeraRaid.get();
             case ALL_RAID -> EffectivenessConfig.CONFIG.telegramNotifyAllRaid.get();
@@ -62,6 +66,8 @@ public enum TelegramEventType {
             case SHINY -> EffectivenessConfig.CONFIG.telegramNotifyShiny.set(enabled);
             case LEGENDARY -> EffectivenessConfig.CONFIG.telegramNotifyLegendary.set(enabled);
             case ULTRA_BOSS -> EffectivenessConfig.CONFIG.telegramNotifyUltraBoss.set(enabled);
+            case LEGENDARY_BOSS -> EffectivenessConfig.CONFIG.telegramNotifyLegendaryBoss.set(enabled);
+            case EPIC_BOSS -> EffectivenessConfig.CONFIG.telegramNotifyEpicBoss.set(enabled);
             case ALL_BOSS -> EffectivenessConfig.CONFIG.telegramNotifyBoss.set(enabled);
             case TERA_RAID -> EffectivenessConfig.CONFIG.telegramNotifyTeraRaid.set(enabled);
             case ALL_RAID -> EffectivenessConfig.CONFIG.telegramNotifyAllRaid.set(enabled);
