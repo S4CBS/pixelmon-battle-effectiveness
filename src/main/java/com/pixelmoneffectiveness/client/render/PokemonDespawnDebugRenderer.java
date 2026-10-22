@@ -1,6 +1,8 @@
 package com.pixelmoneffectiveness.client.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.math.Axis;
+import com.pixelmoneffectiveness.client.telegram.TelegramEventWatcher;
 import com.pixelmoneffectiveness.handler.PokemonFreezeDespawnHandler;
 import com.pixelmonmod.pixelmon.api.pokemon.Pokemon;
 import com.pixelmonmod.pixelmon.api.pokemon.boss.BossTier;
@@ -15,15 +17,16 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.client.event.RegisterClientCommandsEvent;
-import net.neoforged.neoforge.client.event.RenderLivingEvent;
+import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.common.extensions.IEntityExtension;
 
 /**
  * In-world nametag renderer displaying live Pokemon despawn timers above their models.
+ * Uses RenderLevelStageEvent (AFTER_TRANSLUCENT_BLOCKS) so it works regardless of custom Pixelmon renderers.
  * Toggled via /nbtPixelmonDebug command.
  */
 public class PokemonDespawnDebugRenderer {
@@ -31,7 +34,7 @@ public class PokemonDespawnDebugRenderer {
     public static boolean debugEnabled = false;
 
     public static void init() {
-        NeoForge.EVENT_BUS.addListener(PokemonDespawnDebugRenderer::onRenderLivingPost);
+        NeoForge.EVENT_BUS.addListener(PokemonDespawnDebugRenderer::onRenderLevelStage);
         NeoForge.EVENT_BUS.addListener(PokemonDespawnDebugRenderer::onRegisterClientCommands);
     }
 
@@ -66,105 +69,129 @@ public class PokemonDespawnDebugRenderer {
     }
 
     @SubscribeEvent
-    public static void onRenderLivingPost(RenderLivingEvent.Post<?, ?> event) {
+    public static void onRenderLevelStage(RenderLevelStageEvent event) {
+        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) {
+            return;
+        }
         if (!debugEnabled) {
             return;
         }
 
-        LivingEntity living = event.getEntity();
-        if (!(living instanceof PixelmonEntity pixelmon) || !pixelmon.isAlive()) {
-            return;
-        }
-
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null) {
+        if (mc.player == null || mc.level == null) {
             return;
         }
 
-        double distSq = pixelmon.distanceToSqr(mc.player);
-        // Render within 120 blocks for clear visibility without screen clutter
-        if (distSq > 120.0 * 120.0) {
-            return;
-        }
-
-        CompoundTag data = getPokemonData(pixelmon, mc);
+        Camera camera = event.getCamera();
+        Vec3 camPos = camera.getPosition();
+        PoseStack poseStack = event.getPoseStack();
+        Font font = mc.font;
+        MultiBufferSource.BufferSource bufferSource = mc.renderBuffers().bufferSource();
         long now = System.currentTimeMillis();
 
-        String statusText;
-        int textColor;
-
-        // Check exemptions
-        if (pixelmon.hasOwner() || pixelmon.getOwnerUUID() != null) {
-            statusText = "⭐ [Приручен: ∞]";
-            textColor = 0x55FF55;
-        } else if (pixelmon.battleController != null) {
-            statusText = "⚔ [В бою: ⏸]";
-            textColor = 0xFFAAAA;
-        } else if (pixelmon.hasCustomName() || pixelmon.isPersistenceRequired()) {
-            statusText = "🏷 [Бирка: ∞]";
-            textColor = 0xFFFFAA;
-        } else if (isBoss(pixelmon)) {
-            statusText = "👑 [Босс: ∞]";
-            textColor = 0xFFFF55;
-        } else if (isLegendary(pixelmon)) {
-            statusText = "✨ [Легендарный: ∞]";
-            textColor = 0x55FFFF;
-        } else if (data != null && data.contains("pe_global_despawn_time")) {
-            long globalDespawn = data.getLong("pe_global_despawn_time");
-            long remainingMs = Math.max(0L, globalDespawn - now);
-            long sec = remainingMs / 1000L;
-            long m = sec / 60;
-            long s = sec % 60;
-            statusText = String.format("⏳ %d:%02d [Активен]", m, s);
-            if (sec > 120) {
-                textColor = 0x55FF55; // green
-            } else if (sec > 30) {
-                textColor = 0xFFFF55; // yellow
-            } else {
-                textColor = 0xFF5555; // red
+        for (Entity entity : mc.level.entitiesForRendering()) {
+            if (!(entity instanceof PixelmonEntity pixelmon) || !pixelmon.isAlive()) {
+                continue;
             }
-        } else if (data != null && data.contains("pe_last_seen_time")) {
-            long lastSeen = data.getLong("pe_last_seen_time");
-            long elapsed = now - lastSeen;
-            long remainingMs = Math.max(0L, PokemonFreezeDespawnHandler.FAR_DESPAWN_TIMEOUT_MS - elapsed);
-            long sec = remainingMs / 1000L;
-            long m = sec / 60;
-            long s = sec % 60;
-            statusText = String.format("❄ %d:%02d [Заморожен]", m, s);
-            textColor = 0x55FFFF; // cyan
-        } else {
-            statusText = "⏳ 4:00 [Активен]";
-            textColor = 0x55FF55;
+
+            double distSq = pixelmon.distanceToSqr(mc.player);
+            // Render within 96 blocks for clean, high performance visibility
+            if (distSq > 96.0 * 96.0) {
+                continue;
+            }
+
+            CompoundTag data = getPokemonData(pixelmon, mc);
+
+            String statusText;
+            int textColor;
+
+            // Check exemptions
+            if (!TelegramEventWatcher.isWildPokemon(pixelmon)) {
+                statusText = "⭐ [Приручен: ∞]";
+                textColor = 0x55FF55;
+            } else if (pixelmon.battleController != null) {
+                statusText = "⚔ [В бою: ⏸]";
+                textColor = 0xFFAAAA;
+            } else if (pixelmon.hasCustomName() || pixelmon.isPersistenceRequired()) {
+                statusText = "🏷 [Бирка: ∞]";
+                textColor = 0xFFFFAA;
+            } else if (isBoss(pixelmon)) {
+                statusText = "👑 [Босс: ∞]";
+                textColor = 0xFFFF55;
+            } else if (isLegendary(pixelmon)) {
+                statusText = "✨ [Легендарный: ∞]";
+                textColor = 0x55FFFF;
+            } else if (data != null && data.contains("pe_global_despawn_time")) {
+                long globalDespawn = data.getLong("pe_global_despawn_time");
+                long remainingMs = Math.max(0L, globalDespawn - now);
+                long sec = remainingMs / 1000L;
+                long m = sec / 60;
+                long s = sec % 60;
+                statusText = String.format("⏳ %d:%02d [Активен]", m, s);
+                if (sec > 120) {
+                    textColor = 0x55FF55; // green
+                } else if (sec > 30) {
+                    textColor = 0xFFFF55; // yellow
+                } else {
+                    textColor = 0xFF5555; // red
+                }
+            } else if (data != null && data.contains("pe_last_seen_time")) {
+                long lastSeen = data.getLong("pe_last_seen_time");
+                long elapsed = now - lastSeen;
+                long remainingMs = Math.max(0L, PokemonFreezeDespawnHandler.FAR_DESPAWN_TIMEOUT_MS - elapsed);
+                long sec = remainingMs / 1000L;
+                long m = sec / 60;
+                long s = sec % 60;
+                statusText = String.format("❄ %d:%02d [Заморожен]", m, s);
+                textColor = 0x55FFFF; // cyan
+            } else {
+                long sec = Math.max(0L, 240L - (pixelmon.tickCount / 20L));
+                long m = sec / 60;
+                long s = sec % 60;
+                statusText = String.format("⏳ %d:%02d [Активен]", m, s);
+                if (sec > 120) {
+                    textColor = 0x55FF55;
+                } else if (sec > 30) {
+                    textColor = 0xFFFF55;
+                } else {
+                    textColor = 0xFF5555;
+                }
+            }
+
+            // Billboard in-world position above model
+            double lx = pixelmon.getX() - camPos.x;
+            double ly = pixelmon.getY() + pixelmon.getBbHeight() + 0.85 - camPos.y;
+            double lz = pixelmon.getZ() - camPos.z;
+
+            poseStack.pushPose();
+            poseStack.translate(lx, ly, lz);
+
+            poseStack.mulPose(Axis.YP.rotationDegrees(-camera.getYRot()));
+            poseStack.mulPose(Axis.XP.rotationDegrees(camera.getXRot()));
+
+            double dist = Math.sqrt(distSq);
+            float scale = (float) Math.max(0.02f, Math.min(0.06f, dist * 0.0025f));
+            poseStack.scale(-scale, -scale, scale);
+
+            float halfWidth = -font.width(statusText) / 2.0F;
+
+            font.drawInBatch(
+                    statusText,
+                    halfWidth,
+                    0,
+                    textColor,
+                    false,
+                    poseStack.last().pose(),
+                    bufferSource,
+                    Font.DisplayMode.SEE_THROUGH,
+                    0x88000000,
+                    15728880
+            );
+
+            poseStack.popPose();
         }
 
-        // Render above model
-        PoseStack poseStack = event.getPoseStack();
-        MultiBufferSource bufferSource = event.getMultiBufferSource();
-        Camera camera = mc.gameRenderer.getMainCamera();
-
-        poseStack.pushPose();
-        float height = pixelmon.getBbHeight() + 0.65F;
-        poseStack.translate(0.0D, height, 0.0D);
-        poseStack.mulPose(camera.rotation());
-        poseStack.scale(-0.025F, -0.025F, 0.025F);
-
-        Font font = mc.font;
-        float halfWidth = -font.width(statusText) / 2.0F;
-
-        font.drawInBatch(
-                statusText,
-                halfWidth,
-                0,
-                textColor,
-                false,
-                poseStack.last().pose(),
-                bufferSource,
-                Font.DisplayMode.SEE_THROUGH,
-                0x88000000,
-                0xF000F0
-        );
-
-        poseStack.popPose();
+        bufferSource.endBatch();
     }
 
     private static CompoundTag getPokemonData(PixelmonEntity pixelmon, Minecraft mc) {
@@ -174,6 +201,9 @@ public class PokemonDespawnDebugRenderer {
                 ServerLevel sLevel = server.getLevel(mc.level.dimension());
                 if (sLevel != null) {
                     Entity sEntity = sLevel.getEntity(pixelmon.getId());
+                    if (sEntity == null && pixelmon.getUUID() != null) {
+                        sEntity = sLevel.getEntity(pixelmon.getUUID());
+                    }
                     if (sEntity instanceof PixelmonEntity sPixelmon && (Object) sPixelmon instanceof IEntityExtension ext) {
                         return ext.getPersistentData();
                     }
