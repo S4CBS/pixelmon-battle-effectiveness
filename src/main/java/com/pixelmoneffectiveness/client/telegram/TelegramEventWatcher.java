@@ -209,8 +209,6 @@ public class TelegramEventWatcher {
             return;
         }
 
-        TelegramBotClient.markEntityNotified(pixelmon.getUUID());
-
         String displayName = pokemon.getDisplayName().getString();
         String translatedName = (pokemon.getSpecies() != null && pokemon.getSpecies().getNameTranslation() != null)
                 ? pokemon.getSpecies().getNameTranslation().getString() : "";
@@ -232,7 +230,9 @@ public class TelegramEventWatcher {
         BlockPos pos = pixelmon.blockPosition();
         sb.append(TelegramBotClient.formatLocationBlock(pos, level));
 
-        TelegramBotClient.sendNotification(sb.toString());
+        if (TelegramBotClient.sendNotification(sb.toString())) {
+            TelegramBotClient.markEntityNotified(pixelmon.getUUID());
+        }
     }
 
     public static boolean isTeraRaid(DenEntity den, RaidData raidData) {
@@ -309,9 +309,6 @@ public class TelegramEventWatcher {
 
         if (!notify) return;
 
-        TelegramBotClient.markEntityNotified(notifyKey);
-        TelegramBotClient.markEntityNotified(den.getUUID());
-
         String pokeName = pokemon.getDisplayName().getString();
         RECENT_RAID_ANNOUNCEMENTS.put(pokeName.toLowerCase(java.util.Locale.ROOT), System.currentTimeMillis());
         if (pokemon.getSpecies() != null) {
@@ -337,7 +334,10 @@ public class TelegramEventWatcher {
         BlockPos pos = den.blockPosition();
         sb.append(TelegramBotClient.formatLocationBlock(pos, level));
 
-        TelegramBotClient.sendNotification(sb.toString());
+        if (TelegramBotClient.sendNotification(sb.toString())) {
+            TelegramBotClient.markEntityNotified(notifyKey);
+            TelegramBotClient.markEntityNotified(den.getUUID());
+        }
     }
 
     @SubscribeEvent
@@ -422,8 +422,6 @@ public class TelegramEventWatcher {
 
         if (!notify) return;
 
-        TelegramBotClient.markPositionNotified(pos);
-
         StringBuilder sb = new StringBuilder();
         sb.append(header).append("\n\n");
         sb.append("▫️ <b>Сундук:</b> ").append(tierName);
@@ -431,7 +429,9 @@ public class TelegramEventWatcher {
         sb.append("\n");
         sb.append(TelegramBotClient.formatLocationBlock(pos, level));
 
-        TelegramBotClient.sendNotification(sb.toString());
+        if (TelegramBotClient.sendNotification(sb.toString())) {
+            TelegramBotClient.markPositionNotified(pos);
+        }
     }
 
     public static void onPokeStopDiscovered(BlockPos pos, PokeStopTier tier, Level level) {
@@ -439,11 +439,12 @@ public class TelegramEventWatcher {
         if (TelegramBotClient.isPositionNotified(pos)) return;
 
         if (tier == PokeStopTier.LEGENDARY && TelegramEventType.LEGENDARY_POKESTOP.isEnabled()) {
-            TelegramBotClient.markPositionNotified(pos);
             String sb = "🏛️ <b>[Pixelmon] Найден Легендарный ПокеСтоп!</b>\n\n" +
                     "▫️ <b>Тип:</b> Золотой Легендарный ПокеСтоп\n" +
                     TelegramBotClient.formatLocationBlock(pos, level);
-            TelegramBotClient.sendNotification(sb);
+            if (TelegramBotClient.sendNotification(sb)) {
+                TelegramBotClient.markPositionNotified(pos);
+            }
         }
     }
 
