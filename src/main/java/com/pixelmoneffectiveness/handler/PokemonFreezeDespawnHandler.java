@@ -13,16 +13,19 @@ import java.util.List;
 
 public class PokemonFreezeDespawnHandler {
 
-    public static final double DESPAWN_DISTANCE_CHUNKS = 62.5;
     public static final double DESPAWN_DISTANCE_BLOCKS = 1000.0; // 1000 blocks
     public static final double DESPAWN_DISTANCE_SQ = DESPAWN_DISTANCE_BLOCKS * DESPAWN_DISTANCE_BLOCKS;
 
-    public static final double FREEZE_DISTANCE_BLOCKS = 32.0; // 2 chunks
+    public static final double FREEZE_DISTANCE_BLOCKS = 32.0; // 32 blocks
     public static final double FREEZE_DISTANCE_SQ = FREEZE_DISTANCE_BLOCKS * FREEZE_DISTANCE_BLOCKS;
 
-    public static final long DESPAWN_TIMEOUT_MS = 20L * 60L * 1000L; // 20 minutes
+    public static final long FAR_DESPAWN_TIMEOUT_MS = 10L * 60L * 1000L; // 10 minutes (32 to 1000 blocks)
+    public static final long NEAR_DESPAWN_TIMEOUT_MS = 4L * 60L * 1000L; // 4 minutes (active/near lifetime)
+    private static final long FREEZE_REAPPROACH_THRESHOLD_MS = 10_000L; // 10 seconds away to consider re-approached
 
-    private static final String NBT_LAST_SEEN = "pe_last_seen_time";
+    private static final String NBT_LAST_FAR_SEEN = "pe_last_seen_time";
+    private static final String NBT_GLOBAL_DESPAWN = "pe_global_despawn_time";
+    private static final String NBT_FREEZE_TIME = "pe_freeze_time";
 
     private static CompoundTag getPersistentData(PixelmonEntity pixelmon) {
         if ((Object) pixelmon instanceof IEntityExtension ext) {
@@ -49,9 +52,15 @@ public class PokemonFreezeDespawnHandler {
         long now = System.currentTimeMillis();
 
         if (event.loadedFromDisk()) {
-            if (data != null && data.contains(NBT_LAST_SEEN)) {
-                long lastSeen = data.getLong(NBT_LAST_SEEN);
-                if (now - lastSeen > DESPAWN_TIMEOUT_MS) {
+            if (data != null && data.contains(NBT_GLOBAL_DESPAWN)) {
+                long globalDespawn = data.getLong(NBT_GLOBAL_DESPAWN);
+                if (now >= globalDespawn) {
+                    event.setCanceled(true);
+                    return;
+                }
+            } else if (data != null && data.contains(NBT_LAST_FAR_SEEN)) {
+                long lastSeen = data.getLong(NBT_LAST_FAR_SEEN);
+                if (now - lastSeen > FAR_DESPAWN_TIMEOUT_MS) {
                     event.setCanceled(true);
                     return;
                 }
@@ -67,11 +76,46 @@ public class PokemonFreezeDespawnHandler {
                 if (minDistanceSq > FREEZE_DISTANCE_SQ) {
                     pixelmon.setNoAi(true);
                     pixelmon.canMove = false;
+                    if (data != null) {
+                        data.putLong(NBT_FREEZE_TIME, now);
+                    }
+                } else {
+                    pixelmon.setNoAi(false);
+                    pixelmon.canMove = true;
+                    if (data != null) {
+                        data.putLong(NBT_LAST_FAR_SEEN, now);
+                        if (!data.contains(NBT_GLOBAL_DESPAWN)) {
+                            data.putLong(NBT_GLOBAL_DESPAWN, now + NEAR_DESPAWN_TIMEOUT_MS);
+                        }
+                    }
                 }
             }
         } else {
+            // Fresh spawn
             if (data != null) {
-                data.putLong(NBT_LAST_SEEN, now);
+                data.putLong(NBT_LAST_FAR_SEEN, now);
+            }
+
+            Double minDistanceSq = getMinPlayerDistanceSq(pixelmon, event.getLevel());
+            if (minDistanceSq != null) {
+                if (minDistanceSq >= DESPAWN_DISTANCE_SQ) {
+                    event.setCanceled(true);
+                    return;
+                }
+
+                if (minDistanceSq <= FREEZE_DISTANCE_SQ) {
+                    pixelmon.setNoAi(false);
+                    pixelmon.canMove = true;
+                    if (data != null) {
+                        data.putLong(NBT_GLOBAL_DESPAWN, now + NEAR_DESPAWN_TIMEOUT_MS);
+                    }
+                } else {
+                    pixelmon.setNoAi(true);
+                    pixelmon.canMove = false;
+                    if (data != null) {
+                        data.putLong(NBT_FREEZE_TIME, now);
+                    }
+                }
             }
         }
     }
@@ -91,7 +135,13 @@ public class PokemonFreezeDespawnHandler {
             return;
         }
 
+        CompoundTag data = getPersistentData(pixelmon);
+        long now = System.currentTimeMillis();
+
         if (isExempt(pixelmon)) {
+            if (pixelmon.battleController != null && data != null && data.contains(NBT_GLOBAL_DESPAWN)) {
+                data.putLong(NBT_GLOBAL_DESPAWN, now + NEAR_DESPAWN_TIMEOUT_MS);
+            }
             if (pixelmon.isNoAi()) {
                 pixelmon.setNoAi(false);
                 pixelmon.canMove = true;
@@ -101,54 +151,87 @@ public class PokemonFreezeDespawnHandler {
 
         Level level = pixelmon.level();
         Double minDistanceSq = getMinPlayerDistanceSq(pixelmon, level);
-        long now = System.currentTimeMillis();
-        CompoundTag data = getPersistentData(pixelmon);
 
-        // If no players are currently in this dimension, keep last seen and do not discard immediately
+        // If no players are currently in this dimension, check timeouts
         if (minDistanceSq == null) {
-            if (data != null && data.contains(NBT_LAST_SEEN)) {
-                long lastSeen = data.getLong(NBT_LAST_SEEN);
-                if (now - lastSeen > DESPAWN_TIMEOUT_MS) {
-                    pixelmon.discard();
+            if (data != null) {
+                if (data.contains(NBT_GLOBAL_DESPAWN)) {
+                    long globalDespawn = data.getLong(NBT_GLOBAL_DESPAWN);
+                    if (now >= globalDespawn) {
+                        pixelmon.discard();
+                        return;
+                    }
+                } else if (data.contains(NBT_LAST_FAR_SEEN)) {
+                    long lastSeen = data.getLong(NBT_LAST_FAR_SEEN);
+                    if (now - lastSeen > FAR_DESPAWN_TIMEOUT_MS) {
+                        pixelmon.discard();
+                        return;
+                    }
                 }
             }
             return;
         }
 
-        // Rule 1: Distance >= 50 chunks (800 blocks) -> Despawn immediately
+        // Rule 1: Distance >= 1000 blocks -> Despawn immediately
         if (minDistanceSq >= DESPAWN_DISTANCE_SQ) {
             pixelmon.discard();
             return;
         }
 
-        // Rule 2: 20-minute timeout if player hasn't approached within 32 blocks
-        if (data != null) {
-            if (data.contains(NBT_LAST_SEEN)) {
-                long lastSeen = data.getLong(NBT_LAST_SEEN);
-                if (now - lastSeen > DESPAWN_TIMEOUT_MS && minDistanceSq > FREEZE_DISTANCE_SQ) {
-                    pixelmon.discard();
-                    return;
-                }
-            } else {
-                data.putLong(NBT_LAST_SEEN, now);
+        // Rule 2: If global 4-minute timer was set, check if it expired
+        if (data != null && data.contains(NBT_GLOBAL_DESPAWN)) {
+            long globalDespawn = data.getLong(NBT_GLOBAL_DESPAWN);
+            if (now >= globalDespawn) {
+                pixelmon.discard();
+                return;
             }
         }
 
-        // Rule 3: Freezing <= 49 chunks, unfreezing when player is close
-        if (minDistanceSq > FREEZE_DISTANCE_SQ) {
-            // Player is away (> 32 blocks and < 800 blocks) -> Freeze AI for optimal performance
-            if (!pixelmon.isNoAi()) {
-                pixelmon.setNoAi(true);
-            }
-            pixelmon.canMove = false;
-        } else {
-            // Player is nearby (<= 32 blocks) -> Unfreeze & refresh activity timer
-            if (pixelmon.isNoAi()) {
+        // Rule 3: Near vs Far handling
+        if (minDistanceSq <= FREEZE_DISTANCE_SQ) {
+            // Player is nearby (<= 32 blocks)
+            boolean wasFrozen = pixelmon.isNoAi();
+            if (wasFrozen) {
                 pixelmon.setNoAi(false);
             }
             pixelmon.canMove = true;
+
             if (data != null) {
-                data.putLong(NBT_LAST_SEEN, now);
+                // Reset the 10-minute far timer
+                data.putLong(NBT_LAST_FAR_SEEN, now);
+
+                // If approaching from far away (was frozen for >10s) or no global timer set yet:
+                // Grant the 4-minute global timer!
+                if (!data.contains(NBT_GLOBAL_DESPAWN)) {
+                    data.putLong(NBT_GLOBAL_DESPAWN, now + NEAR_DESPAWN_TIMEOUT_MS);
+                } else if (wasFrozen) {
+                    long freezeDuration = now - data.getLong(NBT_FREEZE_TIME);
+                    if (freezeDuration >= FREEZE_REAPPROACH_THRESHOLD_MS) {
+                        data.putLong(NBT_GLOBAL_DESPAWN, now + NEAR_DESPAWN_TIMEOUT_MS);
+                    }
+                }
+            }
+        } else {
+            // Player is far (> 32 blocks and < 1000 blocks) -> Freeze AI for optimal performance
+            if (!pixelmon.isNoAi()) {
+                pixelmon.setNoAi(true);
+                if (data != null) {
+                    data.putLong(NBT_FREEZE_TIME, now);
+                }
+            }
+            pixelmon.canMove = false;
+
+            // If no global despawn timer was set yet (never approached), check 10-minute timeout
+            if (data != null && !data.contains(NBT_GLOBAL_DESPAWN)) {
+                if (data.contains(NBT_LAST_FAR_SEEN)) {
+                    long lastSeen = data.getLong(NBT_LAST_FAR_SEEN);
+                    if (now - lastSeen > FAR_DESPAWN_TIMEOUT_MS) {
+                        pixelmon.discard();
+                        return;
+                    }
+                } else {
+                    data.putLong(NBT_LAST_FAR_SEEN, now);
+                }
             }
         }
     }
