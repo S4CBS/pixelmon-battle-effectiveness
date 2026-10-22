@@ -405,6 +405,11 @@ public class PokemonPokedexScreen extends Screen {
     }
 
     @Override
+    public void renderBackground(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        // Disabled to prevent Minecraft 1.21's renderBlurredBackground post-shader from blurring the screen!
+    }
+
+    @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         guiGraphics.fillGradient(0, 0, this.width, this.height, 0x88000000, 0x88000000);
 

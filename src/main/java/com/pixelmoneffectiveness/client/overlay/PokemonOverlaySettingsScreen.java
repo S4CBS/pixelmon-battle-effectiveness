@@ -367,6 +367,11 @@ public class PokemonOverlaySettingsScreen extends Screen {
     }
 
     @Override
+    protected void renderBlurredBackground(float partialTick) {
+        // Disabled for crisp UI
+    }
+
+    @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         boolean isRu = isRussian();
         int left = (this.width - DIALOG_WIDTH) / 2;

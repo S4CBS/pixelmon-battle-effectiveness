@@ -449,34 +449,51 @@ public class TelegramSettingsScreen extends Screen {
     }
 
     @Override
+    protected void renderBlurredBackground(float partialTick) {
+        // Disabled for crisp UI
+    }
+
+    @Override
+    public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+        // Disabled to prevent Minecraft 1.21's renderBlurredBackground post-shader from blurring the screen!
+    }
+
+    @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+        // 1. Semi-transparent backdrop
+        g.fillGradient(0, 0, this.width, this.height, 0x88000000, 0x88000000);
+
         boolean isRu = isRussianLanguage();
         int left = (this.width - DIALOG_WIDTH) / 2;
         int top = (this.height - DIALOG_HEIGHT) / 2;
 
-        // Background card
-        g.fill(left, top, left + DIALOG_WIDTH, top + DIALOG_HEIGHT, 0xF010141E);
+        // 2. Background card
+        g.fill(left, top, left + DIALOG_WIDTH, top + DIALOG_HEIGHT, 0xF510141E);
+        // Top accent line (Cyan/Sky)
+        g.fill(left, top, left + DIALOG_WIDTH, top + 2, 0xFF38BDF8);
         // Border outline
         g.renderOutline(left, top, DIALOG_WIDTH, DIALOG_HEIGHT, 0xFF35425E);
 
-        // Header Title
-        g.drawString(this.font, isRu ? "📱 Telegram Уведомления" : "📱 Telegram Notifications", left + 12, top + 10, 0xFFE0E0, false);
+        // 3. Header Title
+        g.drawString(this.font, isRu ? "📱 Telegram Уведомления" : "📱 Telegram Notifications", left + 12, top + 10, 0xFFFFFFFF, true);
 
+        // 4. Tab content
         if (activeTab == Tab.SETTINGS) {
             renderSettingsTab(g, left, top, isRu);
         } else {
             renderListTab(g, left, top, mouseX, mouseY, isRu);
         }
 
+        // 5. Render widgets directly without triggering vanilla renderBackground blur
         super.render(g, mouseX, mouseY, partialTick);
     }
 
     private void renderSettingsTab(GuiGraphics g, int left, int top, boolean isRu) {
-        g.drawString(this.font, isRu ? "Токен бота (Bot Token):" : "Bot Token:", left + 14, top + 52, 0xFDE047, false);
-        g.drawString(this.font, isRu ? "ID чата (Chat ID):" : "Chat ID:", left + 14, top + 92, 0xFDE047, false);
+        g.drawString(this.font, isRu ? "Токен бота (Bot Token):" : "Bot Token:", left + 14, top + 52, 0xFDE047, true);
+        g.drawString(this.font, isRu ? "ID чата (Chat ID):" : "Chat ID:", left + 14, top + 92, 0xFDE047, true);
 
         if (testStatus != null) {
-            g.drawString(this.font, testStatus, left + 14, top + 152, testStatusSuccess ? 0x4ADE80 : 0xF87171, false);
+            g.drawString(this.font, testStatus, left + 14, top + 152, testStatusSuccess ? 0x4ADE80 : 0xF87171, true);
         }
 
         // Instructions card
@@ -485,13 +502,13 @@ public class TelegramSettingsScreen extends Screen {
         g.fill(left + 14, guideTop, left + DIALOG_WIDTH - 14, guideTop + guideH, 0x60000000);
         g.renderOutline(left + 14, guideTop, DIALOG_WIDTH - 28, guideH, 0x40FFFFFF);
 
-        g.drawString(this.font, isRu ? "§6💡 Быстрая настройка за 1 минуту:" : "§6💡 Fast 1-minute setup:", left + 20, guideTop + 6, 0xFFFFFF, false);
-        g.drawString(this.font, isRu ? "§71. Откройте Telegram и напишите §e@BotFather" : "§71. Open Telegram and message §e@BotFather", left + 20, guideTop + 20, 0xCBD5E1, false);
-        g.drawString(this.font, isRu ? "§72. Отправьте §e/newbot§7, задайте имя и скопируйте §eAPI Token" : "§72. Send §e/newbot§7, name it, copy the §eAPI Token", left + 20, guideTop + 34, 0xCBD5E1, false);
-        g.drawString(this.font, isRu ? "§73. Напишите §e@userinfobot§7 чтобы узнать свой §eId (Chat ID)" : "§73. Message §e@userinfobot§7 to get your §eChat ID", left + 20, guideTop + 48, 0xCBD5E1, false);
-        g.drawString(this.font, isRu ? "§74. Напишите своему новому боту любое сообщение (например, §e/start§7)" : "§74. Send any message to your new bot (e.g. §e/start§7)", left + 20, guideTop + 62, 0xCBD5E1, false);
-        g.drawString(this.font, isRu ? "§75. Вставьте Token и Chat ID выше и нажмите §e'Тест'" : "§75. Paste credentials above and click §e'Send Test'", left + 20, guideTop + 76, 0xCBD5E1, false);
-        g.drawString(this.font, isRu ? "§a✓ Точные координаты и команда /tp будут приходить прямо в чат!" : "§a✓ Exact coordinates & /tp command will arrive in chat!", left + 20, guideTop + 92, 0x4ADE80, false);
+        g.drawString(this.font, isRu ? "§6💡 Быстрая настройка за 1 минуту:" : "§6💡 Fast 1-minute setup:", left + 20, guideTop + 6, 0xFFFFFF, true);
+        g.drawString(this.font, isRu ? "§71. Откройте Telegram и напишите §e@BotFather" : "§71. Open Telegram and message §e@BotFather", left + 20, guideTop + 20, 0xCBD5E1, true);
+        g.drawString(this.font, isRu ? "§72. Отправьте §e/newbot§7, задайте имя и скопируйте §eAPI Token" : "§72. Send §e/newbot§7, name it, copy the §eAPI Token", left + 20, guideTop + 34, 0xCBD5E1, true);
+        g.drawString(this.font, isRu ? "§73. Напишите §e@userinfobot§7 чтобы узнать свой §eId (Chat ID)" : "§73. Message §e@userinfobot§7 to get your §eChat ID", left + 20, guideTop + 48, 0xCBD5E1, true);
+        g.drawString(this.font, isRu ? "§74. Напишите своему новому боту любое сообщение (например, §e/start§7)" : "§74. Send any message to your new bot (e.g. §e/start§7)", left + 20, guideTop + 62, 0xCBD5E1, true);
+        g.drawString(this.font, isRu ? "§75. Вставьте Token и Chat ID выше и нажмите §e'Тест'" : "§75. Paste credentials above and click §e'Send Test'", left + 20, guideTop + 76, 0xCBD5E1, true);
+        g.drawString(this.font, isRu ? "§a✓ Точные координаты и команда /tp будут приходить прямо в чат!" : "§a✓ Exact coordinates & /tp command will arrive in chat!", left + 20, guideTop + 92, 0x4ADE80, true);
     }
 
     private void renderListTab(GuiGraphics g, int left, int top, int mouseX, int mouseY, boolean isRu) {
@@ -516,9 +533,9 @@ public class TelegramSettingsScreen extends Screen {
                     g.renderOutline(left + 10, curY, DIALOG_WIDTH - 24, 24, outlineColor);
 
                     // Title
-                    g.drawString(this.font, type.getDisplayName(isRu), left + 16, curY + 4, enabled ? 0xFFFFFF : 0x94A3B8, false);
+                    g.drawString(this.font, type.getDisplayName(isRu), left + 16, curY + 4, enabled ? 0xFFFFFF : 0x94A3B8, true);
                     // Desc
-                    g.drawString(this.font, type.getDescription(isRu), left + 16, curY + 14, 0x64748B, false);
+                    g.drawString(this.font, type.getDescription(isRu), left + 16, curY + 14, 0x64748B, true);
 
                     // Toggle Pill
                     int pillX = left + DIALOG_WIDTH - 58;
@@ -528,14 +545,14 @@ public class TelegramSettingsScreen extends Screen {
                     g.renderOutline(pillX, pillY, 40, 16, enabled ? 0xFF4ADE80 : 0xFF475569);
                     String pillText = enabled ? (isRu ? "ВКЛ" : "ON") : (isRu ? "ВЫКЛ" : "OFF");
                     int textW = this.font.width(pillText);
-                    g.drawString(this.font, pillText, pillX + (40 - textW) / 2, pillY + 4, enabled ? 0xFFFFFF : 0x94A3B8, false);
+                    g.drawString(this.font, pillText, pillX + (40 - textW) / 2, pillY + 4, enabled ? 0xFFFFFF : 0x94A3B8, true);
                 }
                 curY += 26;
             }
         }
 
         if (activeTab == Tab.ALL && !displayedSpecies.isEmpty()) {
-            g.drawString(this.font, isRu ? "§6Отслеживаемые покемоны из Покедекса:" : "§6Tracked Pokédex Pokémon:", left + 12, curY + 4, 0xFDE047, false);
+            g.drawString(this.font, isRu ? "§6Отслеживаемые покемоны из Покедекса:" : "§6Tracked Pokédex Pokémon:", left + 12, curY + 4, 0xFDE047, true);
             curY += 16;
         }
 
@@ -572,11 +589,11 @@ public class TelegramSettingsScreen extends Screen {
                     if (!entry.displayName.equalsIgnoreCase(entry.englishName)) {
                         nameStr += " (" + entry.englishName + ")";
                     }
-                    g.drawString(this.font, entry.formattedDex + " " + nameStr, cardX + 26, cardY + 4, isSelected ? 0xFFFFFF : 0xE2E8F0, false);
+                    g.drawString(this.font, entry.formattedDex + " " + nameStr, cardX + 26, cardY + 4, isSelected ? 0xFFFFFF : 0xE2E8F0, true);
 
                     // Status mark
                     String mark = isSelected ? "§a✔" : "§7+";
-                    g.drawString(this.font, mark, cardX + cardW - 14, cardY + 8, isSelected ? 0x4ADE80 : 0x64748B, false);
+                    g.drawString(this.font, mark, cardX + cardW - 14, cardY + 8, isSelected ? 0x4ADE80 : 0x64748B, true);
                 }
             }
         }
