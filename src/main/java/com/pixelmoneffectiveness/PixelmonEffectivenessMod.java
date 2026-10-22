@@ -66,6 +66,7 @@ public class PixelmonEffectivenessMod {
                 event.register(com.pixelmoneffectiveness.client.telegram.TelegramSettingsScreen.OPEN_TELEGRAM_KEY);
             });
             NeoForge.EVENT_BUS.addListener(com.pixelmoneffectiveness.client.telegram.TelegramCommand::onRegisterClientCommands);
+            NeoForge.EVENT_BUS.addListener(com.pixelmoneffectiveness.client.telegram.TelegramEventWatcher::onClientChatReceived);
             NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.client.event.ClientTickEvent.Post event) -> {
                 net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
                 if (mc.level == null || mc.player == null) return;

@@ -20,10 +20,18 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class TelegramEventWatcher {
+
+    private static final Map<String, Long> RECENT_RAID_ANNOUNCEMENTS = new ConcurrentHashMap<>();
+    private static final Pattern RAID_MSG_RU = Pattern.compile("Рейд на (.+) был замечен в (.+) биоме!", Pattern.CASE_INSENSITIVE);
+    private static final Pattern RAID_MSG_EN = Pattern.compile("(.+) has appeared in a den in a (.+) biome!", Pattern.CASE_INSENSITIVE);
 
     @SubscribeEvent
     public static void onEntityJoinLevel(EntityJoinLevelEvent event) {
@@ -252,8 +260,7 @@ public class TelegramEventWatcher {
     }
 
     public static void handleDenSpawn(DenEntity den, Level level) {
-        if (den == null || !den.isAlive()) return;
-        if (TelegramBotClient.isEntityNotified(den.getUUID())) return;
+        if (den == null || den.isRemoved()) return;
 
         Optional<RaidData> optData = den.getData();
         if (!optData.isPresent()) return;
@@ -263,6 +270,9 @@ public class TelegramEventWatcher {
         if (pokemon == null) return;
         int stars = raidData.getStars();
         if (stars <= 0) return;
+
+        UUID notifyKey = (pokemon.getUUID() != null) ? pokemon.getUUID() : den.getUUID();
+        if (TelegramBotClient.isEntityNotified(notifyKey)) return;
 
         boolean isTera = isTeraRaid(den, raidData);
         TelegramEventType raidEvent = TelegramEventType.getRaidEventType(isTera, stars);
@@ -299,9 +309,15 @@ public class TelegramEventWatcher {
 
         if (!notify) return;
 
+        TelegramBotClient.markEntityNotified(notifyKey);
         TelegramBotClient.markEntityNotified(den.getUUID());
 
         String pokeName = pokemon.getDisplayName().getString();
+        RECENT_RAID_ANNOUNCEMENTS.put(pokeName.toLowerCase(java.util.Locale.ROOT), System.currentTimeMillis());
+        if (pokemon.getSpecies() != null) {
+            RECENT_RAID_ANNOUNCEMENTS.put(pokemon.getSpecies().getName().toLowerCase(java.util.Locale.ROOT), System.currentTimeMillis());
+        }
+
         StringBuilder sb = new StringBuilder();
         sb.append(header).append("\n\n");
         sb.append("▫️ <b>Покемон:</b> ").append(TelegramBotClient.escapeHtml(pokeName));
@@ -322,6 +338,64 @@ public class TelegramEventWatcher {
         sb.append(TelegramBotClient.formatLocationBlock(pos, level));
 
         TelegramBotClient.sendNotification(sb.toString());
+    }
+
+    @SubscribeEvent
+    public static void onClientChatReceived(net.neoforged.neoforge.client.event.ClientChatReceivedEvent.System event) {
+        if (!TelegramBotClient.isConfigured()) return;
+        Component comp = event.getMessage();
+        if (comp == null) return;
+        String raw = comp.getString().trim();
+
+        String pokemonName = null;
+        String biomeName = null;
+
+        Matcher mRu = RAID_MSG_RU.matcher(raw);
+        if (mRu.find()) {
+            pokemonName = mRu.group(1).trim();
+            biomeName = mRu.group(2).trim();
+        } else {
+            Matcher mEn = RAID_MSG_EN.matcher(raw);
+            if (mEn.find()) {
+                pokemonName = mEn.group(1).trim();
+                biomeName = mEn.group(2).trim();
+            }
+        }
+
+        if (pokemonName != null && biomeName != null) {
+            handleChatRaidAnnouncement(pokemonName, biomeName);
+        }
+    }
+
+    private static void handleChatRaidAnnouncement(String pokemonName, String biomeName) {
+        long now = System.currentTimeMillis();
+        Long lastTime = RECENT_RAID_ANNOUNCEMENTS.get(pokemonName.toLowerCase(java.util.Locale.ROOT));
+        if (lastTime != null && (now - lastTime < 30_000L)) {
+            // Already handled with full coordinates by DenEntityMixin
+            return;
+        }
+
+        boolean isLegendaryNotification = TelegramEventType.LEGENDARY.isEnabled();
+        boolean isTracked = TelegramBotClient.isPokemonTracked(pokemonName);
+
+        if (!isLegendaryNotification && !isTracked) {
+            return;
+        }
+
+        RECENT_RAID_ANNOUNCEMENTS.put(pokemonName.toLowerCase(java.util.Locale.ROOT), now);
+
+        String time = java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"));
+        String header = isTracked
+                ? "🎯🔴 <b>[Pixelmon] Рейд с отслеживаемым покемоном!</b>"
+                : "👑🔴 <b>[Pixelmon] Рейд на легендарного покемона!</b>";
+
+        String msg = header + "\n\n" +
+                "▫️ <b>Покемон:</b> " + TelegramBotClient.escapeHtml(pokemonName) + "\n" +
+                "▫️ <b>Биом:</b> " + TelegramBotClient.escapeHtml(biomeName) + "\n" +
+                "▫️ <b>Время:</b> <code>" + time + "</code>\n" +
+                "▫️ <i>(Объявление из чата сервера — точные координаты будут получены при приближении к логову)</i>";
+
+        TelegramBotClient.sendNotification(msg);
     }
 
     public static void onLootChestDiscovered(BlockPos pos, PokeLootTier tier, boolean isHidden, Level level) {
